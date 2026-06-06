@@ -18,15 +18,21 @@ from qrcode.image.pure import PyPNGImage
 import google.generativeai as genai
 import PyPDF2
 
-# Configure Gemini
+# Configure Environment
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
 
 # ─────────────────────────────────────────────
-#  SUPABASE CREDENTIALS
+#  CONFIG (env vars — set via env.yaml on Cloud Run)
 # ─────────────────────────────────────────────
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    print("[WARN] GEMINI_API_KEY not set — AI recruitment features disabled")
 
 # ─────────────────────────────────────────────
 #  APP INIT  (middleware order: Session → Auth → Routes)
@@ -71,7 +77,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 # Order matters: Session must be added LAST so it wraps outermost
 app.add_middleware(AuthMiddleware)
-app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET_KEY", "hrm-fallback-secret"), max_age=28800)
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=28800)
 
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -3075,4 +3081,6 @@ async def finance_dashboard(request: Request):
     
     return templates.TemplateResponse("finance/dashboard.html", ctx(request, "finance_dashboard", stats=stats))
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=False)
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", "5000"))
+    uvicorn.run("app:app", host=host, port=port, reload=False)
