@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — CorpHRM{% endblock %}
+{% block page_title %}Analytics Dashboard{% endblock %}
+{% block page_subtitle %}{{ today }} · Live data from Supabase{% endblock %}
+
+{% block content %}
+<!-- KPI Row 1 -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+  {% set kpis = [
+    ("Total Staff", stats.total_staff, "from-indigo-500 to-indigo-700", "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0", "text-indigo-400"),
+    ("Active Staff", stats.active_staff, "from-emerald-500 to-emerald-700", "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z", "text-emerald-400"),
+    ("Present Today", stats.today_present, "from-cyan-500 to-cyan-700", "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z", "text-cyan-400"),
+    ("Pending Leave", stats.pending_leaves, "from-amber-500 to-amber-700", "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z", "text-amber-400"),
+  ] %}
+  {% for label, val, grad, icon_d, clr in kpis %}
+  <div class="relative overflow-hidden rounded-2xl bg-surface-800 border border-white/5 p-5 hover:border-white/10 transition-all duration-300">
+    <div class="absolute top-0 right-0 w-24 h-24 rounded-full bg-gradient-to-br {{ grad }} opacity-5 translate-x-6 -translate-y-6"></div>
+    <div class="flex items-start justify-between mb-3">
+      <div class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+        <svg class="w-5 h-5 {{ clr }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="{{ icon_d }}"/></svg>
+      </div>
+    </div>
+    <p class="text-3xl font-black text-white mb-0.5">{{ val }}</p>
+    <p class="text-xs text-slate-400 font-medium">{{ label }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- KPI Row 2 -->
+<div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-7">
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-4 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-rose-500/15 flex items-center justify-center flex-shrink-0"><span class="text-rose-400 text-lg font-bold">!</span></div>
+    <div><p class="text-xl font-bold text-white">{{ stats.pending_clearances }}</p><p class="text-xs text-slate-400">Pending Clearances</p></div>
+  </div>
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-4 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center flex-shrink-0">
+      <svg class="w-4.5 h-4.5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </div>
+    <div><p class="text-xl font-bold text-white">{{ stats.active_onboarding }}</p><p class="text-xs text-slate-400">Active Onboarding</p></div>
+  </div>
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-4 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center flex-shrink-0">
+      <svg class="w-4.5 h-4.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+    </div>
+    <div><p class="text-xl font-bold text-white">{{ stats.open_recruitment }}</p><p class="text-xs text-slate-400">Open Positions</p></div>
+  </div>
+  <div class="rounded-2xl bg-surface-800 border border-emerald-500/20 p-4 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+      <svg class="w-4.5 h-4.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </div>
+    <div><p class="text-xl font-bold text-white">{{ stats.total_payroll_paid }}</p><p class="text-xs text-slate-400">Total Payroll Paid</p></div>
+  </div>
+  <div class="rounded-2xl bg-surface-800 border border-orange-500/20 p-4 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-orange-500/15 flex items-center justify-center flex-shrink-0">
+      <span class="text-orange-400 text-lg font-bold">%</span>
+    </div>
+    <div><p class="text-xl font-bold text-white">{{ stats.turnover_rate }}</p><p class="text-xs text-slate-400">Turnover Rate</p></div>
+  </div>
+</div>
+
+<!-- Charts Row -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-7">
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-6">
+    <h2 class="text-sm font-bold text-white mb-4">Today's Attendance Overview</h2>
+    <canvas id="attChart" height="200"></canvas>
+  </div>
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-6">
+    <h2 class="text-sm font-bold text-white mb-4">Leave Status Breakdown</h2>
+    <canvas id="leaveChart" height="200"></canvas>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
+  {% set actions = [
+    ("/employees/add","+ Add Employee","indigo"),
+    ("/attendance","📋 Record Attendance","cyan"),
+    ("/leave","📅 Submit Leave","amber"),
+    ("/onboarding","🚀 Start Onboarding","purple"),
+  ] %}
+  {% for href, label, clr in actions %}
+  <a href="{{ href }}" class="flex items-center justify-center gap-2 rounded-2xl border border-{{ clr }}-500/20 bg-{{ clr }}-500/5 hover:bg-{{ clr }}-500/10 px-4 py-3.5 text-sm font-semibold text-{{ clr }}-400 transition-all duration-200">
+    {{ label }}
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Bottom Grid: Employees & Announcements -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+  <!-- Recent Employees -->
+  <div class="lg:col-span-2 rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+    <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-white">Employee Snapshot</h2>
+      <a href="/employees" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">View All →</a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-surface-850">
+          <tr>
+            {% for h in ["ID","Name","Status"] %}
+            <th class="text-left py-3 px-5 text-xs font-semibold text-slate-400 uppercase tracking-wider">{{ h }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5">
+          {% for emp in recent_employees %}
+          <tr class="hover:bg-white/2 transition-colors">
+            <td class="py-3 px-5"><span class="font-mono text-xs text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">{{ emp.employee_id or '—' }}</span></td>
+            <td class="py-3 px-5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">{{ (emp.Full_name or '?')[0] }}</div>
+                <span class="font-medium text-white">{{ emp.Full_name or '—' }}</span>
+              </div>
+            </td>
+            <td class="py-3 px-5">
+              {% if emp.status == 'Active' %}
+              <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Active</span>
+              {% else %}
+              <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 bg-slate-400/10 px-2 py-0.5 rounded-full">{{ emp.status or '—' }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="py-10 text-center text-slate-500 text-sm">No employees found. <a href="/employees/add" class="text-indigo-400 hover:underline">Add your first employee →</a></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Announcements -->
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-5">
+    <h2 class="text-sm font-bold text-white mb-4">Company Announcements</h2>
+    {% if ann_list %}
+    <div class="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+      {% for a in ann_list | sort(attribute='created_at', reverse=True) %}
+      {% set p = a.priority or 'Medium' %}
+      <div class="flex items-start gap-3 bg-white/3 hover:bg-white/5 border border-white/5 rounded-xl p-3 transition-colors">
+        {% if a.is_pinned %}<span class="text-sm flex-shrink-0">📌</span>{% endif %}
+        <div>
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full
+              {% if p == 'Urgent' %}text-rose-400 bg-rose-400/10
+              {% elif p == 'High' %}text-orange-400 bg-orange-400/10
+              {% elif p == 'Medium' %}text-amber-400 bg-amber-400/10
+              {% else %}text-slate-400 bg-white/5{% endif %}">{{ p }}</span>
+            <span class="text-[10px] text-slate-500">{{ (a.created_at or '')[:10] }}</span>
+          </div>
+          <p class="text-xs font-semibold text-white">{{ a.title }}</p>
+          <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">{{ a.content }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-8 text-slate-500 text-sm">No announcements at this time.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const AC = {{ att_chart|safe }};
+const LC = {{ leave_chart|safe }};
+const gridClr = 'rgba(255,255,255,0.04)';
+const tickClr  = '#64748b';
+
+// Vibrant palettes
+const acPalette = ['#10b981','#f59e0b','#6366f1','#ef4444'];
+const lcPalette = ['#f59e0b','#10b981','#ef4444'];
+
+// Attendance Bar Chart
+new Chart(document.getElementById('attChart').getContext('2d'), {
+  type:'bar',
+  data: {
+    labels: Object.keys(AC),
+    datasets: [{
+      label: 'Employees',
+      data: Object.values(AC),
+      backgroundColor: acPalette.map(c=>c+'99'),
+      borderColor: acPalette,
+      borderWidth: 1,
+      borderRadius: 8
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: gridClr }, ticks: { color: tickClr, font: { size: 11 } } },
+      y: { grid: { color: gridClr }, ticks: { color: tickClr, stepSize: 1 }, beginAtZero: true }
+    }
+  }
+});
+
+// Leave Status Bar Chart
+new Chart(document.getElementById('leaveChart').getContext('2d'), {
+  type:'bar',
+  data: {
+    labels: Object.keys(LC),
+    datasets: [{
+      label: 'Requests',
+      data: Object.values(LC),
+      backgroundColor: lcPalette.map(c=>c+'99'),
+      borderColor: lcPalette,
+      borderWidth: 1,
+      borderRadius: 8
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: gridClr }, ticks: { color: tickClr, font: { size: 11 } } },
+      y: { grid: { color: gridClr }, ticks: { color: tickClr, stepSize: 1 }, beginAtZero: true }
+    }
+  }
+});
+</script>
+{% endblock %}

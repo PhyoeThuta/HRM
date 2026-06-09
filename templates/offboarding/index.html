@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Offboarding — CorpHRM{% endblock %}
+{% block page_title %}Offboarding & Exit Management{% endblock %}
+{% block page_subtitle %}Asset clearance, task tracking, and exit interviews{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-5 text-center"><p class="text-3xl font-black text-white">{{ stats.total }}</p><p class="text-xs text-slate-400 mt-1">Total Cases</p></div>
+  <div class="rounded-2xl bg-surface-800 border border-rose-500/20 p-5 text-center"><p class="text-3xl font-black text-white">{{ stats.on_hold }}</p><p class="text-xs text-slate-400 mt-1">Hold Final Payroll</p></div>
+  <div class="rounded-2xl bg-surface-800 border border-emerald-500/20 p-5 text-center"><p class="text-3xl font-black text-white">{{ stats.cleared }}</p><p class="text-xs text-slate-400 mt-1">Settlement Released</p></div>
+</div>
+
+<!-- Action: Start Offboarding -->
+<div class="rounded-2xl bg-surface-800 border border-white/5 p-5 mb-6">
+  <h2 class="text-sm font-bold text-white mb-4 flex items-center gap-2">🚪 Initiate Offboarding Process</h2>
+  <form method="post" action="/offboarding/start" class="grid grid-cols-2 lg:grid-cols-3 gap-3">
+    <div>
+      <label class="form-label">Employee *</label>
+      <select name="employee_id" required class="form-input">
+        <option value="">— Select Employee —</option>
+        {% for emp in available_emps %}
+        <option value="{{ emp.id }}">{{ emp.Full_name }} ({{ emp.employee_id }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label">Termination Reason</label>
+      <select name="termination_reason" class="form-input">
+        {% for r in ["Resignation","Termination","Retirement","Contract End","Other"] %}
+        <option value="{{ r }}">{{ r }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label">Exit Type</label>
+      <select name="exit_type" class="form-input">
+        <option value="Voluntary">Voluntary</option>
+        <option value="Involuntary">Involuntary</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label">Resignation Date</label>
+      <input type="date" name="resignation_date" class="form-input"/>
+    </div>
+    <div>
+      <label class="form-label">Last Working Date</label>
+      <input type="date" name="last_working_date" class="form-input"/>
+    </div>
+    <div class="flex items-end">
+      <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">🚪 Start Offboarding</button>
+    </div>
+  </form>
+</div>
+
+<!-- Offboarding Cases -->
+<div class="space-y-4">
+  {% for rec in records %}
+  {% set is_cleared = rec.settlement_status and rec.settlement_status.startswith('Release') %}
+  <div class="rounded-2xl bg-surface-800 border {{ 'border-emerald-500/30' if is_cleared else 'border-rose-500/20' }} overflow-hidden">
+    <div class="px-6 py-5 flex items-center justify-between border-b border-white/5">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br {{ 'from-emerald-500 to-teal-600' if is_cleared else 'from-rose-500 to-pink-600' }} flex items-center justify-center text-lg font-black text-white">
+          {{ (rec.Full_name or '?')[0] }}
+        </div>
+        <div>
+          <h3 class="font-bold text-white">{{ rec.Full_name or '—' }}</h3>
+          <div class="flex items-center gap-3 mt-0.5 text-xs text-slate-400">
+            <span class="font-mono text-indigo-400">{{ rec.employee_code or '—' }}</span>
+            <span>{{ rec.dept_name or '—' }}</span>
+            <span>{{ rec.termination_reason or '—' }}</span>
+            <span>Last: {{ rec.last_working_date or '—' }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <!-- Task progress badge -->
+        <div class="text-center">
+          <p class="text-lg font-bold {{ 'text-emerald-400' if rec.task_pct == 100 else 'text-slate-300' }}">{{ rec.task_pct }}%</p>
+          <p class="text-xs text-slate-500">{{ rec.tasks_done }}/{{ rec.tasks_total }} tasks</p>
+        </div>
+        <!-- Settlement badge -->
+        {% if is_cleared %}
+        <div class="flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-3 py-2">
+          <span class="text-xs font-bold text-emerald-400">✓ Release Final Settlement</span>
+        </div>
+        {% else %}
+        <div class="flex items-center gap-2 bg-rose-500/15 border border-rose-500/30 rounded-xl px-3 py-2">
+          <span class="text-xs font-bold text-rose-400">⚠ Hold Final Payroll</span>
+        </div>
+        {% endif %}
+        <!-- Actions -->
+        <div class="flex items-center gap-2">
+          <a href="/offboarding/{{ rec.id }}" class="text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-2 rounded-xl transition-colors">Details →</a>
+          {% if not rec.exit_interview or rec.exit_interview.status != 'Completed' %}
+          <a href="/offboarding/{{ rec.id }}/exit-interview" class="text-sm font-medium text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 px-3 py-2 rounded-xl transition-colors">Exit Interview</a>
+          {% else %}
+          <span class="text-xs text-emerald-400 bg-emerald-400/10 px-2 py-1.5 rounded-xl">✓ Interviewed</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <!-- Quick Clearance Toggles -->
+    <div class="px-6 py-4 grid grid-cols-4 gap-3" id="card-{{ rec.id }}">
+      {% for field, label, icon in [
+        ("laptop_returned","Laptop Returned","💻"),
+        ("access_card_returned","Access Card","🪪"),
+        ("nda_signed","NDA Signed","📝"),
+        ("knowledge_transfer","Knowledge Transfer","🔄")
+      ] %}
+      {% set checked = rec.get(field, False) %}
+      <label class="clearance-item relative rounded-xl border {{ 'border-emerald-500/30 bg-emerald-500/5' if checked else 'border-white/10 bg-white/3' }} p-3 cursor-pointer transition-all duration-300 flex items-center justify-between" id="item-{{ rec.id }}-{{ field }}">
+        <div class="flex items-center gap-2">
+          <span class="text-base">{{ icon }}</span>
+          <span class="text-xs font-medium {{ 'text-emerald-400' if checked else 'text-slate-300' }}">{{ label }}</span>
+        </div>
+        <div class="relative">
+          <input type="checkbox" class="sr-only peer" {{ 'checked' if checked else '' }}
+                 onchange="toggleClearance('{{ rec.id }}', '{{ field }}', this.checked)"/>
+          <div class="w-9 h-5 bg-white/10 peer-checked:bg-emerald-500 rounded-full transition-colors duration-300"></div>
+          <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300 peer-checked:translate-x-4"></div>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-16 text-center">
+    <div class="text-5xl mb-3">🚪</div>
+    <p class="text-slate-400">No offboarding cases. Use the form above to start a process.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const cardStates = {};
+{% for rec in records %}
+cardStates['{{ rec.id }}'] = {
+  laptop_returned: {{ 'true' if rec.get('laptop_returned') else 'false' }},
+  access_card_returned: {{ 'true' if rec.get('access_card_returned') else 'false' }},
+  nda_signed: {{ 'true' if rec.get('nda_signed') else 'false' }},
+  knowledge_transfer: {{ 'true' if rec.get('knowledge_transfer') else 'false' }},
+};
+{% endfor %}
+
+async function toggleClearance(id, field, value) {
+  if (!cardStates[id]) cardStates[id] = {};
+  cardStates[id][field] = value;
+  const item = document.getElementById(`item-${id}-${field}`);
+  if (item) {
+    if (value) { item.classList.add('border-emerald-500/30','bg-emerald-500/5'); item.classList.remove('border-white/10','bg-white/3'); }
+    else { item.classList.remove('border-emerald-500/30','bg-emerald-500/5'); item.classList.add('border-white/10','bg-white/3'); }
+  }
+  try {
+    const res = await fetch('/api/offboarding/toggle', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id, field, value, all_checks: cardStates[id] })
+    });
+    const data = await res.json();
+    showToast(data.all_cleared ? '✅ All cleared — Settlement Released & Supabase updated!' : `${field.replace('_',' ')} updated`, data.all_cleared ? 'success' : 'info');
+  } catch(e) { console.warn(e); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Announcements — Boss Panel{% endblock %}
+{% block page_title %}Announcements 📢{% endblock %}
+{% block page_subtitle %}Post company-wide notices — visible to all users on their dashboard{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <!-- Form -->
+  <div class="lg:col-span-1">
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-5 sticky top-24">
+      <h2 class="text-sm font-bold text-white mb-4">Post Announcement</h2>
+      <form method="post" action="/boss/announcements/add" class="space-y-3">
+        <div><label class="form-label">Title *</label><input type="text" name="title" required class="form-input" placeholder="Announcement title"/></div>
+        <div><label class="form-label">Message *</label><textarea name="content" required class="form-input h-24 resize-none" placeholder="Write your message..."></textarea></div>
+        <div>
+          <label class="form-label">Priority</label>
+          <select name="priority" class="form-input">
+            <option value="Low" class="bg-[#1e293b] text-white">Low</option>
+            <option value="Medium" selected class="bg-[#1e293b] text-white">Medium</option>
+            <option value="High" class="bg-[#1e293b] text-white">High</option>
+            <option value="Urgent" class="bg-[#1e293b] text-white">Urgent</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Audience</label>
+          <select name="target_role" class="form-input">
+            <option value="All" class="bg-[#1e293b] text-white">Everyone</option>
+            <option value="boss" class="bg-[#1e293b] text-white">Boss Only</option>
+            <option value="hr_manager" class="bg-[#1e293b] text-white">HR Manager</option>
+            <option value="general_manager" class="bg-[#1e293b] text-white">General Manager</option>
+            <option value="employee" class="bg-[#1e293b] text-white">All Employees</option>
+            {% if employees %}
+            <optgroup label="Specific Employees" class="bg-[#0f172a] text-slate-400 font-bold">
+              {% for emp in employees %}
+              <option value="{{ emp.id }}" class="bg-[#1e293b] text-white">{{ emp.Full_name }}</option>
+              {% endfor %}
+            </optgroup>
+            {% endif %}
+          </select>
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="is_pinned" value="true" class="rounded"/>
+          <span class="text-xs text-slate-300">Pin this announcement</span>
+        </label>
+        <button type="submit" class="w-full text-sm font-bold text-white py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition-colors">Post Announcement</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- List -->
+  <div class="lg:col-span-2 space-y-3">
+    {% if announcements %}
+    {% for a in announcements | sort(attribute='created_at', reverse=True) %}
+    {% set p = a.priority or 'Medium' %}
+    <div class="rounded-2xl bg-surface-800 border {% if a.is_pinned %}border-amber-500/20{% else %}border-white/5{% endif %} p-5">
+      <div class="flex items-start gap-3">
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full mt-0.5 flex-shrink-0
+          {% if p == 'Urgent' %}text-rose-400 bg-rose-400/10
+          {% elif p == 'High' %}text-orange-400 bg-orange-400/10
+          {% elif p == 'Medium' %}text-amber-400 bg-amber-400/10
+          {% else %}text-slate-400 bg-white/5{% endif %}">{{ p }}</span>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="text-sm font-bold text-white">{{ a.title }}</h3>
+            {% if a.is_pinned %}<span class="text-xs text-amber-400">📌 Pinned</span>{% endif %}
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">{{ a.content }}</p>
+          <div class="flex items-center gap-3 mt-2 text-[10px] text-slate-500">
+            <span>By {{ a.created_by or 'Boss' }}</span>
+            <span>·</span>
+            <span>{{ (a.created_at or '')[:10] }}</span>
+            <span>·</span>
+            <span class="capitalize">Audience: {{ a.target_name or (a.target_role or 'All').replace('_',' ') }}</span>
+          </div>
+        </div>
+        <div class="flex-shrink-0 flex items-center gap-2">
+          {% if a.target_role == 'Pending HR Review' and current_user.role != 'boss' %}
+          <form method="post" action="/boss/announcements/{{ a.id }}/publish">
+            <button type="submit" class="text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 rounded-lg transition-colors font-semibold">Publish to All</button>
+          </form>
+          {% endif %}
+          <form method="post" action="/boss/announcements/{{ a.id }}/delete" onsubmit="return confirm('Delete this announcement?')" class="flex-shrink-0">
+            <button type="submit" class="text-xs text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1 rounded-lg transition-colors">Delete</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-16 text-center">
+      <div class="text-5xl mb-3">📢</div>
+      <p class="text-slate-400 text-sm">No announcements yet.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% block title %}Recruitment — CorpHRM{% endblock %}
+{% block page_title %}Recruitment{% endblock %}
+{% block page_subtitle %}Active Pipeline · Hired · Rejected Talent Pool{% endblock %}
+
+{% block content %}
+
+<!-- Summary Stats -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+  {% for label, val, clr, icon in [
+    ("Total Candidates", candidates|length, "indigo", "👥"),
+    ("In Pipeline", pipeline|length, "cyan", "🔄"),
+    ("Shortlisted", shortlisted|length, "amber", "⭐"),
+    ("Hired", hired|length, "emerald", "✅"),
+    ("Talent Pool", rejected|length, "rose", "📂")
+  ] %}
+  <div class="rounded-2xl bg-surface-800 border border-{{ clr }}-500/15 p-4 flex items-center gap-3">
+    <span class="text-xl">{{ icon }}</span>
+    <div>
+      <p class="text-2xl font-black text-white">{{ val }}</p>
+      <p class="text-xs text-slate-400">{{ label }}</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Top Bar: Tabs + Actions -->
+<div class="flex items-center gap-3 mb-5 flex-wrap">
+  <div class="flex items-center gap-1 bg-surface-800 border border-white/5 rounded-xl p-1">
+    {% for tid, icon, label in [("tab-pipeline","🔄","Active Pipeline"),("tab-hired","✅","Hired"),("tab-rejected","📂","Talent Pool")] %}
+    <button id="btn-{{ tid }}" onclick="switchTab('{{ tid }}')"
+      class="tab-btn px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 whitespace-nowrap
+        {% if loop.first %}bg-indigo-600 text-white shadow{% else %}text-slate-400 hover:text-white{% endif %}">
+      {{ icon }} {{ label }}
+    </button>
+    {% endfor %}
+  </div>
+  <div class="ml-auto flex items-center gap-2">
+    <button onclick="openModal('add-pos-modal')" class="text-sm font-medium text-slate-300 bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-2.5 rounded-xl transition-colors">+ Position</button>
+    <button onclick="openModal('add-cand-modal')" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+      Add Candidate
+    </button>
+  </div>
+</div>
+
+<!-- ══ TAB 1: ACTIVE PIPELINE (Kanban) ══════════════════════════════ -->
+<div id="tab-pipeline" class="tab-pane">
+  {% set pipeline_stages = ["Applied","Screening","Interview","Offer"] %}
+  {% set stage_colors = {"Applied":"indigo","Screening":"cyan","Interview":"amber","Offer":"purple"} %}
+
+  {% if pipeline|length == 0 %}
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-16 text-center">
+    <div class="text-5xl mb-3">🔄</div>
+    <p class="text-slate-400 text-sm">No active candidates in pipeline.</p>
+    <button onclick="openModal('add-cand-modal')" class="mt-4 text-sm text-indigo-400 hover:underline">Add first candidate</button>
+  </div>
+  {% else %}
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    {% for stage in pipeline_stages %}
+    {% set stage_cands = pipeline | selectattr("status","equalto",stage)|list %}
+    {% set clr = stage_colors.get(stage,"slate") %}
+    <div class="rounded-2xl bg-surface-800 border border-{{ clr }}-500/20 flex flex-col min-h-[280px]">
+      <div class="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+        <span class="text-xs font-bold text-{{ clr }}-400 uppercase tracking-wider">{{ stage }}</span>
+        <span class="text-xs font-black text-white bg-{{ clr }}-500/15 px-2 py-0.5 rounded-full">{{ stage_cands|length }}</span>
+      </div>
+      <div class="flex-1 p-3 space-y-2 overflow-y-auto">
+        {% for cand in stage_cands %}
+        <div class="rounded-xl bg-white/3 border border-white/5 hover:border-{{ clr }}-500/30 p-3.5 transition-all group">
+          <div class="flex items-start gap-2 mb-2">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-{{ clr }}-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+              {{ (cand.full_name or '?')[0] }}
+            </div>
+            <div class="min-w-0">
+              <p class="font-semibold text-white text-sm leading-tight truncate">{{ cand.full_name }}</p>
+              {% if cand.position_title != '—' %}<p class="text-xs text-{{ clr }}-400 truncate">{{ cand.position_title }}</p>{% endif %}
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 mb-1">{{ cand.email or 'No email' }}</p>
+          
+          {% if cand.ai_score %}
+          <div class="mb-2 p-2 bg-indigo-500/10 border border-indigo-500/20 rounded text-xs">
+            <div class="font-bold text-indigo-400">⭐ AI Match: {{ cand.ai_score }}/10</div>
+            <p class="text-slate-400 mt-0.5 line-clamp-2" title="{{ cand.ai_reasoning }}">{{ cand.ai_reasoning }}</p>
+          </div>
+          {% endif %}
+
+          {% if cand.interview_guide %}
+          <button type="button" onclick="showGuide('{{ cand.id }}')" class="w-full text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 py-1.5 rounded-lg transition-colors mb-2">📄 Interview Guide</button>
+          <div id="guide-{{ cand.id }}" class="hidden">{{ cand.interview_guide }}</div>
+          {% endif %}
+
+          <div class="flex items-center gap-1 mb-3">
+            <span class="text-xs bg-white/5 text-slate-400 px-1.5 py-0.5 rounded">{{ cand.source or 'Direct' }}</span>
+            {% if cand.created_at %}<span class="text-xs text-slate-600 font-mono">{{ (cand.created_at or '')[:10] }}</span>{% endif %}
+          </div>
+          <!-- Move stage -->
+          <form method="post" action="/recruitment/{{ cand.id }}/status" class="space-y-1.5">
+            <select name="status" class="w-full text-xs bg-surface-900 border border-white/10 rounded-lg px-2 py-1.5 text-slate-300 focus:ring-1 focus:ring-indigo-500">
+              {% for s in ["Applied","Screening","Interview","Offer","Hired","Rejected"] %}
+              <option value="{{ s }}" {{ 'selected' if s == cand.status else '' }}>→ Move to {{ s }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="w-full text-xs font-semibold text-{{ clr }}-400 bg-{{ clr }}-500/10 hover:bg-{{ clr }}-500/20 py-1.5 rounded-lg transition-colors">Update Stage</button>
+          </form>
+        </div>
+        {% else %}
+        <p class="text-xs text-slate-600 text-center py-8 italic">No candidates</p>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- ══ TAB 2: HIRED ══════════════════════════════════════════════════ -->
+<div id="tab-hired" class="tab-pane hidden">
+  <div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+    <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-white flex items-center gap-2">✅ Successfully Hired</h2>
+      <span class="text-xs text-slate-400">{{ hired|length }} candidate{{ 's' if hired|length != 1 }}</span>
+    </div>
+    {% if hired %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-white/2">
+          <tr>
+            {% for h in ["Candidate","Applied For","Source","Applied Date","Hired Date","Actions"] %}
+            <th class="text-left py-3 px-5 text-xs font-semibold text-slate-400 uppercase tracking-wider">{{ h }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5">
+          {% for cand in hired %}
+          <tr class="hover:bg-white/2 transition-colors">
+            <td class="py-3.5 px-5">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-sm font-bold text-white">{{ (cand.full_name or '?')[0] }}</div>
+                <div>
+                  <p class="font-semibold text-white">{{ cand.full_name }}</p>
+                  <p class="text-xs text-slate-500">{{ cand.email or '—' }}</p>
+                </div>
+              </div>
+            </td>
+            <td class="py-3.5 px-5 text-emerald-400 font-medium text-sm">{{ cand.position_title or '—' }}</td>
+            <td class="py-3.5 px-5"><span class="text-xs bg-white/5 text-slate-400 px-2 py-0.5 rounded-full">{{ cand.source or 'Direct' }}</span></td>
+            <td class="py-3.5 px-5 font-mono text-xs text-slate-400">{{ (cand.created_at or '')[:10] }}</td>
+            <td class="py-3.5 px-5 font-mono text-xs text-emerald-400">{{ (cand.updated_at or '')[:10] or '—' }}</td>
+            <td class="py-3.5 px-5">
+              <form method="post" action="/recruitment/{{ cand.id }}/delete" onsubmit="return confirm('Remove {{ cand.full_name }} from records?')">
+                <button type="submit" class="text-xs text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1 rounded-lg transition-colors">Remove</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-16 text-center text-slate-500 text-sm">
+      <div class="text-4xl mb-3">✅</div>
+      <p>No hired candidates yet. Move a candidate to "Hired" to see them here.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ══ TAB 3: REJECTED TALENT POOL ══════════════════════════════════ -->
+<div id="tab-rejected" class="tab-pane hidden">
+  <div class="rounded-2xl bg-rose-500/5 border border-rose-500/15 px-5 py-3.5 mb-4 flex items-start gap-3">
+    <span class="text-lg mt-0.5">📂</span>
+    <div>
+      <p class="text-sm font-semibold text-rose-300">Talent Pool — Rejected Candidates</p>
+      <p class="text-xs text-slate-400 mt-0.5">These candidates were not selected for a previous role but their resumes and information are kept for future opportunities. You can reconsider any of them for a new position.</p>
+    </div>
+  </div>
+
+  <!-- Search bar -->
+  <div class="mb-4">
+    <input type="text" id="talent-search" oninput="filterTalentPool()" class="form-input" placeholder="🔍 Search by name, email, or position applied..."/>
+  </div>
+
+  {% if rejected %}
+  <div id="talent-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for cand in rejected %}
+    <div class="talent-card rounded-2xl bg-surface-800 border border-white/5 hover:border-rose-500/20 transition-all p-5"
+         data-name="{{ (cand.full_name or '')|lower }}"
+         data-email="{{ (cand.email or '')|lower }}"
+         data-pos="{{ (cand.position_title or '')|lower }}">
+      <div class="flex items-start gap-3 mb-3">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-rose-500/40 to-slate-600 flex items-center justify-center text-base font-bold text-white flex-shrink-0">
+          {{ (cand.full_name or '?')[0] }}
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="font-semibold text-white truncate">{{ cand.full_name }}</p>
+          <p class="text-xs text-rose-400 truncate">Previously applied: {{ cand.position_title or '—' }}</p>
+          <p class="text-xs text-slate-500 truncate">{{ cand.email or 'No email' }}</p>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-1.5 mb-3">
+        {% if cand.phone %}<span class="text-xs bg-white/5 text-slate-400 px-2 py-0.5 rounded-full">📱 {{ cand.phone }}</span>{% endif %}
+        <span class="text-xs bg-white/5 text-slate-400 px-2 py-0.5 rounded-full">{{ cand.source or 'Direct' }}</span>
+        <span class="text-xs text-slate-600 font-mono px-1">{{ (cand.created_at or '')[:10] }}</span>
+      </div>
+      <!-- Reconsider for new role -->
+      <form method="post" class="mt-4 pt-4 border-t border-white/5 space-y-2">
+        <select name="position_id" required class="form-input text-xs">
+          <option value="">— Reconsider for Position —</option>
+          {% for p in positions %}
+          <option value="{{ p.id }}">{{ p.title }}</option>
+          {% endfor %}
+        </select>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <button type="submit" formaction="/recruitment/{{ cand.id }}/reconsider" class="text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 py-1.5 rounded-lg transition-colors">
+            ⭐ Reconsider
+          </button>
+          <a href="mailto:{{ cand.email or '' }}" class="text-xs font-semibold text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 py-1.5 rounded-lg transition-colors text-center flex items-center justify-center">
+            📧 Contact
+          </a>
+        </div>
+        <button type="submit" formaction="/recruitment/{{ cand.id }}/delete" formnovalidate onclick="return confirm('Are you sure you want to permanently delete this candidate?')" class="w-full text-xs font-semibold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 py-1.5 rounded-lg transition-colors">
+          🗑️ Delete Candidate
+        </button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  <p id="no-talent-msg" class="hidden text-center text-slate-500 text-sm py-8">No candidates match your search.</p>
+  {% else %}
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-16 text-center text-slate-500 text-sm">
+    <div class="text-4xl mb-3">📂</div>
+    <p>Talent pool is empty. Rejected candidates will appear here automatically.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ══ ADD CANDIDATE MODAL ════════════════════════════════════════════ -->
+<div id="add-cand-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('add-cand-modal')"></div>
+  <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-lg m-4">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <h2 class="text-base font-bold text-white">Add Candidate to Pipeline</h2>
+      <button onclick="closeModal('add-cand-modal')" class="text-slate-400 hover:text-white">✕</button>
+    </div>
+    <form method="post" action="/recruitment/add" class="p-6 space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2"><label class="form-label">Full Name *</label><input type="text" name="full_name" required class="form-input" placeholder="Candidate's full name"/></div>
+        <div><label class="form-label">Email</label><input type="email" name="email" class="form-input" placeholder="email@example.com"/></div>
+        <div><label class="form-label">Phone</label><input type="text" name="phone" class="form-input" placeholder="+95 9..."/></div>
+        <div>
+          <label class="form-label">Applying For</label>
+          <select name="position_id" class="form-input">
+            <option value="">— Select Position —</option>
+            {% for p in positions %}<option value="{{ p.id }}">{{ p.title }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Source</label>
+          <select name="source" class="form-input">
+            <option value="Direct">Direct Application</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Referral">Employee Referral</option>
+            <option value="Job Board">Job Board</option>
+            <option value="Agency">Agency</option>
+          </select>
+        </div>
+        <div class="col-span-2">
+          <label class="form-label">Notes / Resume Summary</label>
+          <textarea name="notes" class="form-input h-16 resize-none" placeholder="Skills, experience highlights, notes about this candidate..."></textarea>
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <button type="button" onclick="closeModal('add-cand-modal')" class="flex-1 text-sm text-slate-400 py-2.5 rounded-xl bg-white/5">Cancel</button>
+        <button type="submit" class="flex-1 text-sm font-semibold text-white py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700">Add to Pipeline</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ══ ADD POSITION MODAL ══════════════════════════════════════════════ -->
+<div id="add-pos-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('add-pos-modal')"></div>
+  <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-md m-4">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5"><h2 class="text-base font-bold text-white">Add Position</h2><button onclick="closeModal('add-pos-modal')" class="text-slate-400 hover:text-white">✕</button></div>
+    <form method="post" action="/positions/add" class="p-6 space-y-4">
+      <div><label class="form-label">Job Title *</label><input type="text" name="title" required class="form-input" placeholder="e.g. Senior Engineer"/></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="form-label">Level</label><select name="level" class="form-input"><option value="Junior">Junior</option><option value="Mid">Mid</option><option value="Senior">Senior</option><option value="Lead">Lead</option><option value="Manager">Manager</option></select></div>
+        <div><label class="form-label">Team / Dept</label><input type="text" name="team" class="form-input" placeholder="Engineering"/></div>
+        <div><label class="form-label">Base Salary</label><input type="number" name="base_salary" step="0.01" value="0" class="form-input"/></div>
+      </div>
+      <div class="flex gap-3"><button type="button" onclick="closeModal('add-pos-modal')" class="flex-1 text-sm text-slate-400 py-2.5 rounded-xl bg-white/5">Cancel</button><button type="submit" class="flex-1 text-sm font-semibold text-white py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700">Create Position</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- ══ VIEW GUIDE MODAL ══════════════════════════════════════════════ -->
+<div id="guide-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('guide-modal')"></div>
+  <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-2xl m-4 max-h-[80vh] flex flex-col">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <h2 class="text-base font-bold text-white">AI Interview Guide</h2>
+      <button onclick="closeModal('guide-modal')" class="text-slate-400 hover:text-white">✕</button>
+    </div>
+    <div class="p-6 overflow-y-auto whitespace-pre-wrap text-sm text-slate-300" id="guide-content">
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchTab(id) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('bg-indigo-600','text-white','shadow');
+    b.classList.add('text-slate-400');
+  });
+  document.getElementById(id).classList.remove('hidden');
+  const btn = document.getElementById('btn-' + id);
+  btn.classList.add('bg-indigo-600','text-white','shadow');
+  btn.classList.remove('text-slate-400');
+}
+
+function showGuide(id) {
+  const content = document.getElementById('guide-' + id).innerText;
+  document.getElementById('guide-content').innerText = content;
+  openModal('guide-modal');
+}
+
+function filterTalentPool() {
+  const q = document.getElementById('talent-search').value.toLowerCase();
+  const cards = document.querySelectorAll('.talent-card');
+  let visible = 0;
+  cards.forEach(c => {
+    const match = c.dataset.name.includes(q) || c.dataset.email.includes(q) || c.dataset.pos.includes(q);
+    c.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  document.getElementById('no-talent-msg').classList.toggle('hidden', visible > 0);
+}
+</script>
+{% endblock %}

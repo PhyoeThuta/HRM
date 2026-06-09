@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}QR Check-In — CorpHRM{% endblock %}
+{% block page_title %}QR Check-In{% endblock %}
+{% block page_subtitle %}Attendance recorded via QR scan{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto mt-10">
+  {% if success %}
+  <div class="rounded-3xl bg-emerald-500/10 border border-emerald-500/30 p-10 text-center">
+    <div class="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500/50 flex items-center justify-center mx-auto mb-5">
+      <svg class="w-10 h-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+    </div>
+    <h2 class="text-2xl font-black text-white mb-2">{{ action_msg|default('Action Recorded!') }}</h2>
+    <p class="text-lg font-bold text-emerald-400 mb-1">{{ emp_name }}</p>
+    <p class="text-sm text-slate-400 mb-6">{{ emp_code }} · {{ check_in_time }}</p>
+    <div class="bg-white/5 rounded-xl p-4 text-sm text-slate-300">
+      Your attendance has been automatically recorded in the system.
+    </div>
+  </div>
+  {% else %}
+  <div class="rounded-3xl bg-rose-500/10 border border-rose-500/30 p-10 text-center">
+    <div class="w-20 h-20 rounded-full bg-rose-500/20 border-2 border-rose-500/50 flex items-center justify-center mx-auto mb-5">
+      <svg class="w-10 h-10 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </div>
+    <h2 class="text-2xl font-black text-white mb-2">Invalid or Expired QR</h2>
+    <p class="text-sm text-slate-400 mt-2">{{ error_msg }}</p>
+    <p class="text-xs text-slate-500 mt-4">Please ask HR to generate a new QR code.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

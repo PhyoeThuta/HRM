@@ -1,0 +1,302 @@
+{% extends "portal/base.html" %}
+{% block title %}My Daily SOPs — CorpHRM{% endblock %}
+{% block page_title %}Daily SOPs{% endblock %}
+{% block page_subtitle %}Task Verification & Video Upload{% endblock %}
+
+{% block content %}
+<div x-data="{ showAbsentModal: false, absentSopId: '' }">
+<div class="mb-6">
+  <h2 class="text-xl font-bold text-white">My Tasks</h2>
+  <p class="text-sm text-slate-400">Complete your daily procedures and upload video proof.</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {% for s in sops %}
+  <div class="bg-surface-900 border border-white/5 rounded-3xl shadow-xl p-5 flex flex-col relative overflow-hidden group hover:border-indigo-500/30 transition-all">
+    <div class="absolute top-0 right-0 p-4">
+      {% if s.is_completed %}
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        Done
+      </span>
+      {% elif s.is_absent %}
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        Absent
+      </span>
+      {% else %}
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+        Pending
+      </span>
+      {% endif %}
+    </div>
+
+    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{{ s.assigned_date }}</p>
+    <div class="text-sm font-medium leading-relaxed flex-1 space-y-2">
+      {% set lines = s.task_description.strip().split('\n') %}
+      {% for line in lines %}
+        {% set line = line.strip() %}
+        {% if line %}
+        <label class="flex items-start gap-3 cursor-pointer group/chk">
+          <div class="relative flex items-start pt-0.5">
+            <input type="checkbox" class="sop-checkbox-{{ s.id }} w-4 h-4 rounded border-white/20 text-indigo-500 focus:ring-indigo-500/30 transition-all cursor-pointer bg-surface-950" {% if s.is_completed or s.is_absent %}checked disabled{% endif %} />
+          </div>
+          <span class="text-sm {% if s.is_completed or s.is_absent %}line-through text-slate-500{% else %}text-slate-300 group-hover/chk:text-white{% endif %} transition-colors">{{ line }}</span>
+        </label>
+        {% endif %}
+      {% endfor %}
+    </div>
+    
+    <hr class="border-white/5 my-4" />
+
+    {% if s.is_completed %}
+      <div class="text-center">
+        <p class="text-xs text-emerald-400 font-bold mb-2">Completed on {{ s.completed_at[:16].replace('T', ' ') }}</p>
+        {% if s.proof_video_url %}
+          <button onclick="playVideo('{{ s.proof_video_url }}')" class="w-full bg-surface-950 border border-white/10 hover:bg-white/5 hover:border-white/20 text-white font-medium py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-2">
+            <svg class="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            Watch Uploaded Video
+          </button>
+        {% endif %}
+      </div>
+    {% elif s.is_absent %}
+      <div class="text-center py-2">
+        <p class="text-xs text-rose-400 font-bold">Missed due to Absence</p>
+      </div>
+    {% else %}
+      <form action="/portal/sops/{{ s.id }}/complete" method="POST" enctype="multipart/form-data" class="space-y-3" onsubmit="return validateUpload(this, '{{ s.id }}')">
+        <div class="grid grid-cols-2 gap-3">
+          <!-- Live Record Button -->
+          <button type="button" onclick="openRecorder('{{ s.id }}')" class="flex flex-col items-center justify-center gap-1.5 w-full bg-surface-950 border border-white/10 hover:border-rose-500/50 hover:bg-rose-500/5 rounded-xl px-2 py-3 cursor-pointer transition-all group/live">
+            <svg class="w-5 h-5 text-rose-400 group-hover/live:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+            <span class="text-[11px] font-bold text-slate-300 group-hover/live:text-white">Live Record</span>
+          </button>
+          
+          <!-- File Upload -->
+          <label class="flex flex-col items-center justify-center gap-1.5 w-full bg-surface-950 border border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/5 rounded-xl px-2 py-3 cursor-pointer transition-all group/upload relative overflow-hidden">
+            <input type="file" id="fileInput-{{ s.id }}" name="video_file" accept="video/*" class="hidden" onchange="updateFileName(this, 'fileName-{{ s.id }}')" required />
+            <svg class="w-5 h-5 text-indigo-400 group-hover/upload:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            <span class="text-[11px] font-bold text-slate-300 group-hover/upload:text-white">Select File</span>
+          </label>
+        </div>
+        <div class="text-center w-full bg-white/5 py-1.5 rounded-lg border border-white/5">
+            <span id="fileName-{{ s.id }}" class="text-[10px] text-slate-400 font-medium truncate block max-w-full px-2">No video attached</span>
+        </div>
+        <button type="submit" class="w-full bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-bold py-2.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          Upload & Complete
+        </button>
+      </form>
+      <button type="button" @click="absentSopId = '{{ s.id }}'; showAbsentModal = true" class="w-full mt-2 bg-transparent border border-white/10 hover:bg-rose-500/10 hover:border-rose-500/30 hover:text-rose-400 text-slate-400 text-xs font-bold py-2 rounded-xl transition-all">
+        Mark as Absent
+      </button>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="col-span-full py-12 text-center border border-dashed border-white/10 rounded-3xl bg-surface-900/50">
+    <div class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
+      <svg class="w-6 h-6 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+    </div>
+    <h3 class="text-white font-bold mb-1">No pending SOPs</h3>
+    <p class="text-sm text-slate-400">You are all caught up for today!</p>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Absent Confirm Modal -->
+<div x-show="showAbsentModal" x-transition.opacity style="display: none;" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+  <div @click.away="showAbsentModal = false" class="w-full max-w-sm bg-surface-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden text-center p-6 transform transition-all">
+    <div class="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-500/20">
+      <svg class="w-8 h-8 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    </div>
+    <h3 class="text-xl font-bold text-white mb-2">Mark as Absent?</h3>
+    <p class="text-sm text-slate-400 mb-6">Are you sure you want to mark this SOP as missed due to absence? This action cannot be undone.</p>
+    <div class="flex items-center gap-3">
+      <button type="button" @click="showAbsentModal = false" class="flex-1 px-4 py-2.5 bg-surface-800 border border-white/10 hover:bg-white/5 hover:border-white/20 text-white text-sm font-bold rounded-xl transition-all">
+        Cancel
+      </button>
+      <form :action="'/portal/sops/' + absentSopId + '/absent'" method="POST" class="flex-1 m-0">
+        <button type="submit" class="w-full px-4 py-2.5 bg-rose-500 hover:bg-rose-400 text-white text-sm font-bold rounded-xl shadow-lg shadow-rose-500/20 transition-all">
+          Confirm
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Live Video Recorder Modal -->
+<div id="liveRecorderModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4 transition-all">
+  <div class="w-full max-w-lg bg-surface-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden p-6 text-center">
+    <h3 class="text-lg font-bold text-white mb-4">🔴 Live Video Check-In</h3>
+    <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden mb-4 border border-white/5">
+      <video id="livePreview" class="w-full h-full object-cover" autoplay muted playsinline></video>
+      <div id="recordingIndicator" class="hidden absolute top-4 right-4 flex items-center gap-2 bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/10">
+        <span class="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse"></span>
+        <span class="text-xs font-bold text-white tracking-widest" id="recordingTime">00:00</span>
+      </div>
+    </div>
+    <div class="flex justify-center gap-4">
+      <button id="btnStartRecord" type="button" class="bg-rose-500 hover:bg-rose-400 text-white font-bold py-2.5 px-8 rounded-xl shadow-lg shadow-rose-500/20 transition-all flex items-center gap-2">
+        <span class="w-3 h-3 bg-white rounded-full"></span> Start
+      </button>
+      <button id="btnStopRecord" type="button" class="hidden bg-surface-800 hover:bg-surface-700 text-white font-bold py-2.5 px-8 rounded-xl border border-white/10 transition-all flex items-center gap-2">
+        <span class="w-3 h-3 bg-rose-500 rounded-sm"></span> Stop
+      </button>
+      <button id="btnCancelRecord" type="button" onclick="closeRecorder()" class="bg-transparent hover:bg-white/5 text-slate-400 font-bold py-2.5 px-6 rounded-xl transition-all">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Video Player Modal -->
+<div id="videoModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4">
+  <div class="w-full max-w-4xl bg-surface-900 rounded-2xl overflow-hidden relative border border-white/10 shadow-2xl">
+    <div class="absolute top-4 right-4 z-10">
+      <button onclick="closeVideo()" class="bg-black/50 hover:bg-rose-500 text-white p-2 rounded-full backdrop-blur-md transition-all">✕</button>
+    </div>
+    <video id="proofVideo" class="w-full max-h-[80vh] bg-black" controls>
+      <source src="" type="video/mp4">
+    </video>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function updateFileName(input, labelId) {
+    const label = document.getElementById(labelId);
+    if (input.files && input.files.length > 0) {
+      label.textContent = "📎 " + input.files[0].name;
+      label.classList.add('text-emerald-400');
+      label.classList.remove('text-slate-400');
+    } else {
+      label.textContent = "No video attached";
+      label.classList.remove('text-emerald-400');
+      label.classList.add('text-slate-400');
+    }
+  }
+
+  let mediaRecorder;
+  let recordedChunks = [];
+  let currentSopId = null;
+  let stream = null;
+  let recordTimer = null;
+  let startTime = 0;
+
+  async function openRecorder(sopId) {
+    currentSopId = sopId;
+    openModal('liveRecorderModal');
+    document.getElementById('btnStartRecord').classList.remove('hidden');
+    document.getElementById('btnStopRecord').classList.add('hidden');
+    document.getElementById('recordingIndicator').classList.add('hidden');
+    
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: true });
+      document.getElementById('livePreview').srcObject = stream;
+    } catch (err) {
+      alert("Camera access denied or not available. Please allow camera permissions.");
+      closeRecorder();
+    }
+  }
+
+  document.getElementById('btnStartRecord').addEventListener('click', () => {
+    recordedChunks = [];
+    try {
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    } catch(e) {
+      mediaRecorder = new MediaRecorder(stream);
+    }
+    
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) recordedChunks.push(e.data);
+    };
+    
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const file = new File([blob], `live_record_${currentSopId}.webm`, { type: 'video/webm' });
+      
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      
+      const fileInput = document.getElementById(`fileInput-${currentSopId}`);
+      if (fileInput) {
+        fileInput.files = dataTransfer.files;
+        updateFileName(fileInput, `fileName-${currentSopId}`);
+      }
+      closeRecorder();
+    };
+    
+    mediaRecorder.start();
+    document.getElementById('btnStartRecord').classList.add('hidden');
+    document.getElementById('btnStopRecord').classList.remove('hidden');
+    document.getElementById('recordingIndicator').classList.remove('hidden');
+    
+    startTime = Date.now();
+    recordTimer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+      const s = String(elapsed % 60).padStart(2, '0');
+      document.getElementById('recordingTime').innerText = `${m}:${s}`;
+    }, 1000);
+  });
+
+  document.getElementById('btnStopRecord').addEventListener('click', () => {
+    if(mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
+  });
+
+  function closeRecorder() {
+    if (recordTimer) clearInterval(recordTimer);
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    closeModal('liveRecorderModal');
+  }
+
+  function validateUpload(form, sopId) {
+    const checkboxes = document.querySelectorAll('.sop-checkbox-' + sopId);
+    for (let i = 0; i < checkboxes.length; i++) {
+      if (!checkboxes[i].checked) {
+        alert("Please tick all the task checkboxes to confirm you have completed all steps before uploading the video!");
+        return false;
+      }
+    }
+
+    const input = form.querySelector('input[type="file"]');
+    if (!input.files || input.files.length === 0) {
+      alert("Please record a live video or select a video file first.");
+      return false;
+    }
+    const btn = form.querySelector('button[type="submit"]');
+    btn.innerHTML = `<span class="animate-pulse">Uploading...</span>`;
+    btn.disabled = true;
+    btn.classList.add('opacity-70', 'cursor-not-allowed');
+    return true;
+  }
+
+  function playVideo(url) {
+    const player = document.getElementById('proofVideo');
+    player.src = url;
+    openModal('videoModal');
+    player.play().catch(e => console.log(e));
+  }
+  
+  function closeVideo() {
+    const player = document.getElementById('proofVideo');
+    player.pause();
+    player.src = "";
+    closeModal('videoModal');
+  }
+</script>
+{% endblock %}

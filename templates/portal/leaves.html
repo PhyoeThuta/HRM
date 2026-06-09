@@ -1,0 +1,182 @@
+{% extends "portal/base.html" %}
+{% block title %}My Leaves — Employee Portal{% endblock %}
+{% block page_title %}My Leaves 🏖{% endblock %}
+{% block page_subtitle %}View your leave balances and submit requests to HR{% endblock %}
+
+{% block content %}
+<!-- Balance Cards -->
+{% if leave_balances %}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  {% for bal in leave_balances %}
+  {% set entitled = bal.entitled_days | int %}
+  {% set used     = bal.used_days | int %}
+  {% set remain   = bal.remain_days | int %}
+  {% set pct      = (used / entitled * 100) | int if entitled > 0 else 0 %}
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-4">
+    <p class="text-xs font-bold text-slate-400 mb-2 truncate">{{ bal.type_name }}</p>
+    <p class="text-3xl font-black {% if remain == 0 %}text-rose-400{% elif pct > 60 %}text-amber-400{% else %}text-white{% endif %}">{{ remain }}</p>
+    <p class="text-[10px] text-slate-500">days remaining</p>
+    <div class="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
+      <div class="h-full rounded-full transition-all {{ 'bg-rose-500' if pct >= 100 else ('bg-amber-500' if pct > 60 else 'bg-emerald-500') }}"
+        style="width:{{ [pct,100]|min }}%"></div>
+    </div>
+    <p class="text-[10px] text-slate-600 mt-1">{{ used }}/{{ entitled }} used</p>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+
+  <!-- Leave Request Form -->
+  <div class="lg:col-span-2">
+    <div class="rounded-2xl bg-surface-800 border border-indigo-500/15 p-5 sticky top-24">
+      <h2 class="text-sm font-bold text-white mb-1 flex items-center gap-2">
+        <span class="w-7 h-7 rounded-lg bg-indigo-500/15 flex items-center justify-center text-base">📝</span>
+        Request Leave
+      </h2>
+      <p class="text-xs text-slate-500 mb-4">Your request will go to HR for approval.</p>
+
+      {% if emp_id %}
+      <form method="post" action="/portal/leaves/add" class="space-y-3" id="leave-form">
+        <div>
+          <label class="form-label">Leave Type *</label>
+          <select name="leave_type_id" class="form-input" id="leave-type-sel" onchange="updateBalance()">
+            {% for lt in leave_types %}
+            <option value="{{ lt.id }}" data-name="{{ lt.type_name }}">{{ lt.type_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">From *</label>
+          <input type="date" name="start_date" id="start-date" required class="form-input"
+            min="{{ today_date }}" onchange="calcDays()"/>
+        </div>
+        <div>
+          <label class="form-label">To *</label>
+          <input type="date" name="end_date" id="end-date" required class="form-input"
+            min="{{ today_date }}" onchange="calcDays()"/>
+        </div>
+        <div>
+          <label class="form-label">Reason</label>
+          <textarea name="reason" class="form-input h-16 resize-none" placeholder="Brief reason (optional)..."></textarea>
+        </div>
+        <!-- Day count preview -->
+        <div id="day-preview" class="hidden rounded-xl bg-white/3 border border-white/5 p-3 text-center">
+          <p class="text-xs text-slate-400">Request duration</p>
+          <p class="text-xl font-black text-white" id="day-count">—</p>
+          <p class="text-xs text-slate-500 mt-0.5" id="balance-hint">—</p>
+        </div>
+        <button type="submit"
+          class="w-full text-sm font-bold text-white py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/20">
+          Submit to HR →
+        </button>
+      </form>
+      {% else %}
+      <div class="text-center py-6 text-slate-500 text-sm">
+        <div class="text-3xl mb-2">🔗</div>
+        <p>Your account is not linked to an employee record.</p>
+        <p class="text-xs mt-1">Contact HR to link your account.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Leave History -->
+  <div class="lg:col-span-3">
+    <div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+      <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+        <h2 class="text-sm font-bold text-white">Leave History</h2>
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-emerald-400">{{ leave_requests | selectattr('status','eq','Approved') | list | length }} approved</span>
+          <span class="text-slate-600">·</span>
+          <span class="text-amber-400">{{ leave_requests | selectattr('status','eq','Pending') | list | length }} pending</span>
+          <span class="text-slate-600">·</span>
+          <span class="text-rose-400">{{ leave_requests | selectattr('status','eq','Rejected') | list | length }} rejected</span>
+        </div>
+      </div>
+
+      {% if leave_requests %}
+      <div class="divide-y divide-white/5">
+        {% for lr in leave_requests | sort(attribute='created_at', reverse=True) %}
+        {% set s = lr.status or 'Pending' %}
+        <div class="px-5 py-4 hover:bg-white/2 transition-colors">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-sm font-bold text-white">{{ lr.type_name }}</span>
+                <span class="text-xs font-mono text-slate-400">
+                  {{ (lr.start_date or '')[:10] }} → {{ (lr.end_date or '')[:10] }}
+                </span>
+                <span class="text-xs font-bold text-white bg-white/10 px-1.5 py-0.5 rounded-full">{{ lr.total_days }} day(s)</span>
+              </div>
+              {% if lr.reason %}
+              <p class="text-xs text-slate-400 truncate">📝 {{ lr.reason }}</p>
+              {% endif %}
+              <p class="text-[10px] text-slate-600 mt-1">Submitted {{ (lr.created_at or '')[:10] }}</p>
+            </div>
+            <span class="text-xs font-bold px-2.5 py-1.5 rounded-xl flex-shrink-0
+              {% if s == 'Approved' %}text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
+              {% elif s == 'Rejected' %}text-rose-400 bg-rose-500/10 border border-rose-500/20
+              {% else %}text-amber-400 bg-amber-500/10 border border-amber-500/20{% endif %}">
+              {% if s == 'Approved' %}✓ Approved{% elif s == 'Rejected' %}✗ Rejected{% else %}⏳ Pending{% endif %}
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="p-16 text-center">
+        <div class="text-5xl mb-3">🏖</div>
+        <p class="text-slate-400 text-sm">No leave requests yet.</p>
+        <p class="text-slate-500 text-xs mt-1">Use the form to submit your first request.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Leave balance lookup from server data
+const balanceMap = {
+  {% for b in leave_balances %}
+  "{{ b.leave_type_id }}": { remain: {{ b.remain_days | int }}, entitled: {{ b.entitled_days | int }}, used: {{ b.used_days | int }} },
+  {% endfor %}
+};
+
+function calcDays() {
+  const s = document.getElementById('start-date').value;
+  const e = document.getElementById('end-date').value;
+  const preview = document.getElementById('day-preview');
+  if (!s || !e) { preview.classList.add('hidden'); return; }
+  const diff = Math.round((new Date(e) - new Date(s)) / 86400000) + 1;
+  if (diff < 1) { preview.classList.add('hidden'); return; }
+  document.getElementById('day-count').textContent = diff + (diff===1?' day':' days');
+  updateBalance(diff);
+  preview.classList.remove('hidden');
+}
+
+function updateBalance(days) {
+  const lt = document.getElementById('leave-type-sel').value;
+  const bal = balanceMap[lt];
+  const hint = document.getElementById('balance-hint');
+  if (!bal) { hint.textContent = ''; return; }
+  days = days || parseInt(document.getElementById('day-count')?.textContent) || 0;
+  const after = bal.remain - days;
+  if (after < 0) {
+    hint.textContent = `⚠ Only ${bal.remain} day(s) available — cannot submit`;
+    hint.className = 'text-xs text-rose-400 mt-0.5';
+  } else {
+    hint.textContent = `${bal.remain} available → ${after} will remain after approval`;
+    hint.className = 'text-xs text-slate-500 mt-0.5';
+  }
+}
+
+// Set min date to today
+const today = new Date().toISOString().split('T')[0];
+document.getElementById('start-date').min = today;
+document.getElementById('end-date').min = today;
+</script>
+{% endblock %}

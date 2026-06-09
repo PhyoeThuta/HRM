@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Boss Panel — Executive Overview{% endblock %}
+{% block page_title %}Executive Overview 👑{% endblock %}
+{% block page_subtitle %}Company-wide intelligence dashboard — Boss only{% endblock %}
+
+{% block content %}
+
+<!-- Top KPI Cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  {% for label, val, sub, clr, icon in [
+    ("Total Headcount", total_headcount, "Active employees", "amber", "👥"),
+    ("Payroll Disbursed", "MMK {:,.0f}".format(total_payroll), "Total paid this year", "emerald", "💰"),
+    ("Attendance This Month", month_att_count, "Check-ins logged", "indigo", "📋"),
+    ("Late Arrival Rate", "{}%".format(late_pct), "This month", "rose" if late_pct > 20 else "amber", "⏰")
+  ] %}
+  <div class="rounded-2xl bg-surface-800 border border-{{ clr }}-500/15 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-2xl">{{ icon }}</span>
+      <span class="text-xs font-bold text-{{ clr }}-400 bg-{{ clr }}-500/10 px-2 py-0.5 rounded-full">LIVE</span>
+    </div>
+    <p class="text-2xl font-black text-white mb-0.5">{{ val }}</p>
+    <p class="text-xs text-slate-400">{{ label }}</p>
+    <p class="text-[10px] text-slate-600 mt-0.5">{{ sub }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+  <!-- Headcount by Department -->
+  <div class="lg:col-span-1 rounded-2xl bg-surface-800 border border-white/5 p-5">
+    <h2 class="text-sm font-bold text-white mb-4">Department Headcount</h2>
+    {% if dept_counts %}
+    {% set max_count = dept_counts.values() | max %}
+    <div class="space-y-3">
+      {% for dept, count in dept_counts.items() %}
+      {% set pct = (count / max_count * 100) | int %}
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-slate-300 truncate">{{ dept }}</span>
+          <span class="text-xs font-bold text-white ml-2">{{ count }}</span>
+        </div>
+        <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
+          <div class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500" style="width:{{ pct }}%"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-slate-500 text-xs">No employee data yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- KPI Assignments -->
+  <div class="lg:col-span-2 rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+    <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-white">KPI Assignments to Managers</h2>
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-400">{{ pending_kpis|length }} pending</span>
+        <a href="/boss/kpi" class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Manage all →</a>
+      </div>
+    </div>
+    {% if kpi_assigns %}
+    <div class="divide-y divide-white/5 max-h-56 overflow-y-auto">
+      {% for k in kpi_assigns[:5] %}
+      <div class="px-5 py-3 flex items-center gap-4 hover:bg-white/2">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-white truncate">{{ k.title }}</p>
+          <p class="text-xs text-slate-400">Assigned to: <span class="text-indigo-400">{{ k.assigned_to_name or "—" }}</span></p>
+        </div>
+        {% if k.deadline %}<span class="text-xs font-mono text-slate-500">{{ (k.deadline or '')[:10] }}</span>{% endif %}
+        {% set st = k.status or 'Pending' %}
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full
+          {% if st == 'Completed' %}text-emerald-400 bg-emerald-400/10
+          {% elif st == 'In Progress' %}text-amber-400 bg-amber-400/10
+          {% else %}text-slate-400 bg-white/5{% endif %}">{{ st }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="p-8 text-center text-slate-500 text-sm">No KPI assignments yet. <a href="/boss/kpi" class="text-indigo-400 hover:underline">Assign a KPI →</a></div>
+    {% endif %}
+  </div>
+
+  <!-- Announcements Preview -->
+  <div class="lg:col-span-1 rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+    <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-white">Recent Announcements</h2>
+      <a href="/boss/announcements" class="text-xs text-indigo-400 hover:text-indigo-300">Manage →</a>
+    </div>
+    {% if announcements %}
+    <div class="divide-y divide-white/5">
+      {% for a in announcements %}
+      {% set p = a.priority or 'Medium' %}
+      <div class="px-5 py-3">
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5 text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0
+            {% if p == 'Urgent' %}text-rose-400 bg-rose-400/10
+            {% elif p == 'High' %}text-orange-400 bg-orange-400/10
+            {% elif p == 'Medium' %}text-amber-400 bg-amber-400/10
+            {% else %}text-slate-400 bg-white/5{% endif %}">{{ p }}</span>
+          <div>
+            <p class="text-xs font-semibold text-white">{{ a.title }}</p>
+            <p class="text-[10px] text-slate-500 mt-0.5">{{ (a.content or '')[:60] }}{% if (a.content or '')|length > 60 %}...{% endif %}</p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="p-8 text-center text-slate-500 text-xs">No announcements. <a href="/boss/announcements" class="text-indigo-400 hover:underline">Post one →</a></div>
+    {% endif %}
+  </div>
+
+  <!-- System Users -->
+  <div class="lg:col-span-2 rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+    <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+      <h2 class="text-sm font-bold text-white">System Users</h2>
+      <a href="/boss/users" class="text-xs text-indigo-400 hover:text-indigo-300">Manage accounts →</a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead class="bg-white/2"><tr>
+          {% for h in ["User","Role","Status"] %}
+          <th class="text-left py-2.5 px-5 text-slate-400 font-semibold uppercase tracking-wider">{{ h }}</th>
+          {% endfor %}
+        </tr></thead>
+        <tbody class="divide-y divide-white/3">
+          {% for u in sys_users %}
+          <tr class="hover:bg-white/2">
+            <td class="py-2.5 px-5">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold
+                  {% if u.role == 'boss' %}bg-amber-500/20 text-amber-400
+                  {% elif u.role == 'hr_manager' %}bg-indigo-500/20 text-indigo-400
+                  {% elif u.role == 'general_manager' %}bg-cyan-500/20 text-cyan-400
+                  {% else %}bg-white/10 text-slate-400{% endif %}">
+                  {{ (u.full_name or u.username or 'U')[0] }}
+                </div>
+                <div>
+                  <p class="font-semibold text-white">{{ u.full_name or u.username }}</p>
+                  <p class="text-slate-500 font-mono">@{{ u.username }}</p>
+                </div>
+              </div>
+            </td>
+            <td class="py-2.5 px-5">
+              <span class="capitalize text-slate-300">{{ (u.role or '').replace('_',' ') }}</span>
+            </td>
+            <td class="py-2.5 px-5">
+              {% if u.is_active %}
+              <span class="text-emerald-400 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Active</span>
+              {% else %}
+              <span class="text-slate-500">Inactive</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

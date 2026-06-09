@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Vote for {{ nominee.Full_name }} — CorpHRM{% endblock %}
+{% block page_title %}{{ nominee.Full_name }}{% endblock %}
+{% block page_subtitle %}{{ nominee.dept_name }} · {{ nominee.employee_id }} · Peer Voting Profile{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/peer-voting" class="text-sm text-slate-400 hover:text-white flex items-center gap-1.5">← All Employees</a>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <!-- LEFT: Profile Card + Vote Form -->
+  <div class="lg:col-span-1 space-y-4">
+
+    <!-- Profile -->
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-6 text-center">
+      <div class="w-24 h-24 rounded-3xl bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-4xl font-black text-white shadow-2xl shadow-indigo-500/20 mx-auto mb-4">
+        {{ (nominee.Full_name or '?')[0] }}
+      </div>
+      <h2 class="text-xl font-bold text-white mb-1">{{ nominee.Full_name }}</h2>
+      <p class="text-sm text-slate-400 mb-1">{{ nominee.dept_name or '—' }}</p>
+      <p class="font-mono text-xs text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full inline-block">{{ nominee.employee_id }}</p>
+
+      <!-- Aggregate Stats -->
+      <div class="mt-5 grid grid-cols-3 gap-2">
+        <div class="rounded-xl bg-white/5 p-3 text-center">
+          <p class="text-2xl font-black text-white">{{ stats.avg }}</p>
+          <p class="text-[10px] text-slate-400">Avg Score</p>
+        </div>
+        <div class="rounded-xl bg-white/5 p-3 text-center">
+          <p class="text-2xl font-black text-white">{{ stats.votes }}</p>
+          <p class="text-[10px] text-slate-400">Total Votes</p>
+        </div>
+        <div class="rounded-xl bg-white/5 p-3 text-center">
+          <p class="text-2xl font-black text-white">{{ stats.total }}</p>
+          <p class="text-[10px] text-slate-400">Total Score</p>
+        </div>
+      </div>
+
+      <!-- Star display -->
+      <div class="flex items-center justify-center gap-1 mt-4">
+        {% for i in range(5) %}
+        <span class="text-2xl {{ 'text-amber-400' if i < stats.avg|int else ('text-amber-400/50' if (stats.avg - i) > 0.5 else 'text-slate-700') }}">★</span>
+        {% endfor %}
+      </div>
+
+      <!-- Category Breakdown -->
+      {% if stats.cat_avgs %}
+      <div class="mt-5 space-y-2 text-left">
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Category Breakdown</p>
+        {% for cat, avg in stats.cat_avgs.items() %}
+        {% set pct = (avg / 5 * 100)|int %}
+        <div>
+          <div class="flex items-center justify-between mb-0.5">
+            <span class="text-xs text-slate-300">{{ cat }}</span>
+            <span class="text-xs font-bold text-white">{{ avg }}/5</span>
+          </div>
+          <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500" style="width:{{ pct }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Vote Form -->
+    <div class="rounded-2xl bg-surface-800 border border-indigo-500/20 p-6">
+      <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+        <span class="text-lg">⭐</span> Cast Your Vote
+      </h3>
+      <form method="post" action="/peer-voting/{{ nominee.id }}/vote" class="space-y-4">
+        <!-- Voter -->
+        <div>
+          <label class="form-label">You Are *</label>
+          <select name="voter_id" required class="form-input">
+            <option value="">— Select Your Name —</option>
+            {% for emp in voters %}
+            <option value="{{ emp.id }}">{{ emp.Full_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Category -->
+        <div>
+          <label class="form-label">Voting Category *</label>
+          <div class="grid grid-cols-2 gap-2">
+            {% for cat in categories %}
+            <label class="flex items-center gap-2 bg-white/5 hover:bg-white/8 border border-white/10 rounded-xl px-3 py-2.5 cursor-pointer transition-all duration-150 has-[:checked]:border-indigo-500/50 has-[:checked]:bg-indigo-500/10">
+              <input type="radio" name="category" value="{{ cat.name }}" required class="accent-indigo-500 flex-shrink-0"/>
+              <span class="text-xs text-slate-300 font-medium">
+                {{ cat.icon }} {{ cat.name }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Score -->
+        <div>
+          <label class="form-label">Score *</label>
+          <div class="flex items-center gap-2" id="star-row">
+            {% for s in [1,2,3,4,5] %}
+            <label class="flex flex-col items-center gap-1 cursor-pointer group star-label" data-val="{{ s }}">
+              <input type="radio" name="score" value="{{ s }}" required class="sr-only"/>
+              <div class="star-icon text-3xl text-slate-600 group-hover:text-amber-400 transition-colors duration-150 select-none">★</div>
+              <span class="text-[10px] text-slate-500">{{ ['','Poor','Fair','Good','Great','Excellent'][s] }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Comment -->
+        <div>
+          <label class="form-label">Recognition Message</label>
+          <textarea name="comment" rows="3" class="form-input" placeholder="Write a short recognition message... (e.g. 'Great job handling the Q2 launch!')"></textarea>
+        </div>
+
+        <button type="submit" class="w-full text-sm font-bold text-white py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/20">
+          Submit Vote ⭐
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- RIGHT: Vote History Feed -->
+  <div class="lg:col-span-2 space-y-4">
+    <h2 class="text-sm font-bold text-white">Recognition Feed ({{ votes|length }} votes)</h2>
+
+    {% if votes %}
+    {% for v in votes %}
+    <div class="rounded-2xl bg-surface-800 border border-white/5 hover:border-white/10 p-5 transition-all">
+      <div class="flex items-start justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+            {{ (v.voter_name or '?')[0] }}
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-white">{{ v.voter_name or 'Anonymous' }}</p>
+            <p class="text-xs text-slate-400">{{ (v.created_at or '')[:10] }}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-purple-400 bg-purple-400/10 border border-purple-400/20 px-2.5 py-1 rounded-full">{{ v.category }}</span>
+          <div class="flex items-center gap-0.5 ml-1">
+            {% for i in range(5) %}
+            <span class="text-sm {{ 'text-amber-400' if i < (v.score or 0) else 'text-slate-600' }}">★</span>
+            {% endfor %}
+          </div>
+          <span class="text-sm font-bold text-white ml-1">{{ v.score }}/5</span>
+        </div>
+      </div>
+      {% if v.comment %}
+      <div class="bg-white/3 rounded-xl px-4 py-3 border-l-2 border-indigo-500/40">
+        <p class="text-sm text-slate-300 leading-relaxed">"{{ v.comment }}"</p>
+      </div>
+      {% else %}
+      <p class="text-xs text-slate-500 italic">No comment left</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-12 text-center">
+      <div class="text-4xl mb-3">⭐</div>
+      <p class="text-slate-400 text-sm">No votes yet for {{ nominee.Full_name }}.</p>
+      <p class="text-slate-500 text-xs mt-1">Be the first to leave a recognition!</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Interactive star rating
+const labels = document.querySelectorAll('.star-label');
+labels.forEach((lbl, idx) => {
+  lbl.addEventListener('mouseenter', () => {
+    labels.forEach((l, i) => {
+      l.querySelector('.star-icon').style.color = i <= idx ? '#f59e0b' : '#475569';
+    });
+  });
+  lbl.addEventListener('click', () => {
+    lbl.querySelector('input').checked = true;
+    labels.forEach((l, i) => {
+      l.querySelector('.star-icon').style.color = i <= idx ? '#f59e0b' : '#475569';
+    });
+  });
+});
+document.getElementById('star-row').addEventListener('mouseleave', () => {
+  const checked = [...labels].findIndex(l => l.querySelector('input').checked);
+  labels.forEach((l, i) => {
+    l.querySelector('.star-icon').style.color = (checked >= 0 && i <= checked) ? '#f59e0b' : '#475569';
+  });
+});
+</script>
+{% endblock %}

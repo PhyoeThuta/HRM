@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+{% block title %}Payroll & KPI — CorpHRM{% endblock %}
+{% block page_title %}Payroll & KPI Management{% endblock %}
+{% block page_subtitle %}Track salary processing, payments, and performance scores{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="rounded-2xl bg-surface-800 border border-emerald-500/20 p-5 text-center"><p class="text-3xl font-black text-white">${{ "%.0f"|format(stats.total_paid) }}</p><p class="text-xs text-slate-400 mt-1">Total Paid This Period</p></div>
+  <div class="rounded-2xl bg-surface-800 border border-amber-500/20 p-5 text-center"><p class="text-3xl font-black text-white">{{ stats.pending }}</p><p class="text-xs text-slate-400 mt-1">Pending Payrolls</p></div>
+  <div class="rounded-2xl bg-surface-800 border border-rose-500/20 p-5 text-center"><p class="text-3xl font-black text-white">{{ stats.on_hold }}</p><p class="text-xs text-slate-400 mt-1">On Hold</p></div>
+</div>
+
+<div class="flex items-center gap-3 mb-5">
+  <button onclick="openModal('add-payroll-modal')" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">+ Add Payroll Record</button>
+  <button onclick="openKpiSettings()" class="flex items-center gap-2 bg-surface-800 hover:bg-surface-700 text-white border border-white/10 text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">⚙ KPI Settings</button>
+</div>
+
+<!-- Payrolls Table -->
+<div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden mb-6">
+  <div class="px-6 py-4 border-b border-white/5"><h2 class="text-sm font-bold text-white">Payroll Records</h2></div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-surface-850">
+        <tr>{% for h in ["Employee","Month","Basic","Allowances","Deductions","Bonus","Net Salary","KPI Score","Status","Action"] %}<th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">{{ h }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for pay in payrolls %}
+        <tr class="hover:bg-white/2 transition-colors">
+          <td class="py-3.5 px-4"><div class="flex items-center gap-2"><div class="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white">{{ (pay.Full_name or '?')[0] }}</div><div><p class="font-medium text-white text-sm">{{ pay.Full_name or '—' }}</p><p class="text-xs text-slate-500 font-mono">{{ pay.employee_code or '—' }}</p></div></div></td>
+          <td class="py-3.5 px-4 text-slate-300">{{ pay.month or '—' }}</td>
+          <td class="py-3.5 px-4 text-slate-300">${{ "%.0f"|format(pay.basic_salary or 0) }}</td>
+          <td class="py-3.5 px-4 text-emerald-400">+${{ "%.0f"|format(pay.allowances or 0) }}</td>
+          <td class="py-3.5 px-4 text-rose-400">-${{ "%.0f"|format(pay.deductions or 0) }}</td>
+          <td class="py-3.5 px-4 text-cyan-400">+${{ "%.0f"|format(pay.bonus or 0) }}</td>
+          <td class="py-3.5 px-4 font-bold text-white">${{ "%.0f"|format(pay.net_salary or 0) }}</td>
+          <td class="py-3.5 px-4">{% if pay.kpi_score and pay.kpi_score != '—' %}<span class="font-mono text-amber-400">{{ pay.kpi_score }}</span>{% else %}<span class="text-slate-500">—</span>{% endif %}</td>
+          <td class="py-3.5 px-4">
+            {% set st = pay.payment_status or 'Pending' %}
+            {% if st == 'Paid' %}<span class="text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">✓ Paid</span>
+            {% elif st == 'On Hold' %}<span class="text-xs font-semibold text-rose-400 bg-rose-400/10 px-2 py-1 rounded-full">Hold</span>
+            {% else %}<span class="text-xs font-semibold text-amber-400 bg-amber-400/10 px-2 py-1 rounded-full">Pending</span>{% endif %}
+          </td>
+          <td class="py-3.5 px-4 flex items-center gap-2">
+            {% if st == 'Pending' %}
+            <form method="post" action="/payroll/{{ pay.id }}/mark-paid">
+              <button type="submit" class="text-xs font-medium text-emerald-400 bg-emerald-400/10 hover:bg-emerald-400/20 px-2.5 py-1 rounded-lg">Mark Paid</button>
+            </form>
+            {% endif %}
+            <form method="post" action="/payroll/{{ pay.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this payroll record?');">
+              <button type="submit" class="text-xs font-medium text-rose-400 bg-rose-400/10 hover:bg-rose-400/20 px-2.5 py-1 rounded-lg">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" class="py-12 text-center text-slate-500 text-sm">No payroll records yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- KPI Table -->
+<div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+  <div class="px-6 py-4 border-b border-white/5"><h2 class="text-sm font-bold text-white">KPI Reviews</h2></div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-surface-850"><tr>{% for h in ["Employee","Period","Target","Actual","Score %","Comment","Reviewed At", "Action"] %}<th class="text-left py-3 px-5 text-xs font-semibold text-slate-400 uppercase tracking-wider">{{ h }}</th>{% endfor %}</tr></thead>
+      <tbody class="divide-y divide-white/5">
+        {% for kpi in kpis %}
+        {% set pct = ((kpi.actual_score or 0) / (kpi.target_score or 100) * 100)|int %}
+        <tr class="hover:bg-white/2 transition-colors">
+          <td class="py-3.5 px-5"><span class="font-medium text-white">{{ kpi.Full_name or '—' }}</span></td>
+          <td class="py-3.5 px-5 text-slate-300">{{ kpi.recent_period or '—' }}</td>
+          <td class="py-3.5 px-5 font-mono text-slate-300">{{ kpi.target_score or 0 }}</td>
+          <td class="py-3.5 px-5 font-mono {{ 'text-emerald-400' if pct >= 80 else ('text-amber-400' if pct >= 50 else 'text-rose-400') }}">{{ kpi.actual_score or 0 }}</td>
+          <td class="py-3.5 px-5">
+            <div class="flex items-center gap-2">
+              <div class="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden"><div class="h-full rounded-full {{ 'bg-emerald-500' if pct >= 80 else ('bg-amber-500' if pct >= 50 else 'bg-rose-500') }}" style="width:{{ pct }}%"></div></div>
+              <span class="text-xs font-bold {{ 'text-emerald-400' if pct >= 80 else ('text-amber-400' if pct >= 50 else 'text-rose-400') }}">{{ pct }}%</span>
+            </div>
+          </td>
+          <td class="py-3.5 px-5 text-xs text-slate-400 max-w-[200px] truncate">{{ kpi.review_comment or '—' }}</td>
+          <td class="py-3.5 px-5 text-xs text-slate-500">{{ (kpi.reviewed_at or '')[:10] or '—' }}</td>
+          <td class="py-3.5 px-5">
+            <form method="post" action="/kpi/{{ kpi.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this KPI review?');">
+              <button type="submit" class="text-xs font-medium text-rose-400 bg-rose-400/10 hover:bg-rose-400/20 px-2.5 py-1 rounded-lg">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="py-12 text-center text-slate-500 text-sm">No KPI reviews yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ADD PAYROLL MODAL -->
+<div id="add-payroll-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('add-payroll-modal')"></div>
+  <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-xl m-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5"><h2 class="text-base font-bold text-white">Add Payroll Record</h2><button onclick="closeModal('add-payroll-modal')" class="text-slate-400 hover:text-white">✕</button></div>
+    <form method="post" action="/payroll/add" class="p-6 space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2"><label class="form-label">Employee *</label><select name="employee_id" id="payroll_emp_id" required class="form-input"><option value="">— Select Employee —</option>{% for emp in employees %}<option value="{{ emp.id }}">{{ emp.Full_name }} ({{ emp.employee_id }})</option>{% endfor %}</select></div>
+        <div class="col-span-2 flex gap-2">
+            <div class="flex-1"><label class="form-label">Month (e.g. 2026-05)</label><input type="text" name="month" id="payroll_month" required class="form-input" placeholder="2026-05" value="2026-05"/></div>
+            <div class="flex items-end">
+                <button type="button" onclick="autoCalculatePayroll()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20 w-full whitespace-nowrap">
+                    ✨ Auto-Calculate
+                </button>
+            </div>
+        </div>
+        
+        <!-- CALCULATION BREAKDOWN (Hidden by default) -->
+        <div id="calc_breakdown" class="col-span-2 hidden bg-surface-800 p-4 rounded-xl border border-white/5 shadow-inner mt-2">
+            <h3 class="font-bold text-white text-xs mb-3 uppercase tracking-wider text-slate-400">Calculation Breakdown</h3>
+            <div class="space-y-2">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-300">Attendance <span class="text-slate-500">(40%)</span></span>
+                    <span id="breakdown_attendance" class="font-mono text-emerald-400 font-bold">—</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-300">Daily SOPs <span class="text-slate-500">(60%)</span></span>
+                    <span id="breakdown_sops" class="font-mono text-emerald-400 font-bold">—</span>
+                </div>
+                <div class="h-px w-full bg-white/10 my-2"></div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-white font-bold">Final KPI Score</span>
+                    <span id="breakdown_final" class="font-mono text-white font-black bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-300">—</span>
+                </div>
+            </div>
+        </div>
+        
+        <div><label class="form-label">Basic Salary</label><input type="number" name="basic_salary" id="payroll_basic" step="0.01" value="0" class="form-input"/></div>
+        <div><label class="form-label">Allowances</label><input type="number" name="allowances" id="payroll_allowances" step="0.01" value="0" class="form-input"/></div>
+        <div><label class="form-label">Deductions</label><input type="number" name="deductions" id="payroll_deductions" step="0.01" value="0" class="form-input"/></div>
+        <div><label class="form-label">Bonus</label><input type="number" name="bonus" id="payroll_bonus" step="0.01" value="0" class="form-input"/></div>
+      </div>
+      <div class="flex gap-3"><button type="button" onclick="closeModal('add-payroll-modal')" class="flex-1 text-sm text-slate-400 py-2.5 rounded-xl bg-white/5">Cancel</button><button type="submit" class="flex-1 text-sm font-semibold text-white py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700">Save Record</button></div>
+    </form>
+  </div>
+</div>
+
+
+
+<!-- KPI SETTINGS MODAL -->
+<div id="kpi-settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('kpi-settings-modal')"></div>
+  <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-2xl m-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+        <h2 class="text-base font-bold text-white">KPI Calculation Settings</h2>
+        <button onclick="closeModal('kpi-settings-modal')" class="text-slate-400 hover:text-white">✕</button>
+    </div>
+    <div class="p-6 space-y-6">
+        <div>
+            <h3 class="text-sm font-bold text-slate-300 mb-3 border-b border-white/10 pb-2">KPI-Linked Salary %</h3>
+            <p class="text-xs text-slate-400 mb-3">What percentage of the Basic Salary is tied to their KPI score? (If they score under 100%, this portion will be deducted proportionally).</p>
+            <div class="flex items-center gap-2 max-w-xs">
+                <input type="number" id="setting_target_bonus" class="form-input text-right" value="100" />
+                <span class="text-slate-400 font-bold">%</span>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-sm font-bold text-slate-300 mb-3 border-b border-white/10 pb-2">Auto-Calculated Weights (Base = 100%)</h3>
+            <p class="text-xs text-slate-400 mb-3">These metrics are pulled directly from the system automatically.</p>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="form-label">Attendance (%)</label><input type="number" id="setting_att" class="form-input" value="40" oninput="updateTotalWeight()"/></div>
+                <div><label class="form-label">Punctuality (%)</label><input type="number" id="setting_punct" class="form-input" value="0" oninput="updateTotalWeight()"/></div>
+                <div><label class="form-label">Daily SOPs (%)</label><input type="number" id="setting_sops" class="form-input" value="40" oninput="updateTotalWeight()"/></div>
+                <div><label class="form-label">Peer Voting (%)</label><input type="number" id="setting_peer" class="form-input" value="20" oninput="updateTotalWeight()"/></div>
+            </div>
+            <div class="mt-2 text-right">
+                <span id="total_weight_display" class="text-xs font-bold text-emerald-400">Total: 100%</span>
+            </div>
+        </div>
+        
+        <div>
+            <div class="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
+                <h3 class="text-sm font-bold text-slate-300">Manual Metrics (Optional)</h3>
+                <button type="button" onclick="addManualMetric()" class="text-xs text-indigo-400 hover:text-indigo-300 font-bold">+ Add Metric</button>
+            </div>
+            <p class="text-xs text-slate-400 mb-3">Add qualitative metrics (like Hygiene, Safety) that HR will grade manually during payroll calculation. These act as bonus points or strict requirements.</p>
+            <div id="manual_metrics_container" class="space-y-2"></div>
+        </div>
+        
+        <div class="flex gap-3 pt-4 border-t border-white/5">
+            <button type="button" onclick="closeModal('kpi-settings-modal')" class="flex-1 text-sm text-slate-400 py-2.5 rounded-xl bg-white/5">Cancel</button>
+            <button type="button" onclick="saveKpiSettings()" class="flex-1 text-sm font-semibold text-white py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700">Save Settings</button>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentCalculationData = null;
+
+async function autoCalculatePayroll() {
+    const empId = document.getElementById('payroll_emp_id').value;
+    const month = document.getElementById('payroll_month').value;
+    
+    if (!empId || !month) {
+        alert("Please select an Employee and enter a Month first!");
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/payroll/calculate/${empId}/${month}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        
+        currentCalculationData = data;
+        
+        document.getElementById('payroll_basic').value = data.base_salary;
+        document.getElementById('payroll_allowances').value = 0;
+        
+        // Show breakdown
+        const breakdownDiv = document.getElementById('calc_breakdown');
+        breakdownDiv.classList.remove('hidden');
+        
+        let html = `
+            <h3 class="font-bold text-white text-xs mb-3 uppercase tracking-wider text-slate-400">Detailed AI Math Breakdown</h3>
+            <div class="space-y-2">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-300">Attendance <span class="text-slate-500">(${data.auto_weights.attendance || 40}%)</span></span>
+                    <div class="text-right">
+                        <span class="block text-xs text-slate-500">${data.actual_attendance} / ${data.expected_working_days} days</span>
+                        <span class="font-mono text-emerald-400 font-bold">${data.attendance_score}%</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-300">Punctuality <span class="text-slate-500">(${data.auto_weights.punctuality || 0}%)</span></span>
+                    <div class="text-right">
+                        <span class="block text-xs text-slate-500">${data.on_time_count} / ${data.actual_attendance} on-time</span>
+                        <span class="font-mono text-emerald-400 font-bold">${data.punctuality_score}%</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-300">Daily SOPs <span class="text-slate-500">(${data.auto_weights.sops || 40}%)</span></span>
+                    <div class="text-right">
+                        <span class="block text-xs text-slate-500">${data.completed_sops_count} / ${data.total_sops_count} tasks</span>
+                        <span class="font-mono text-emerald-400 font-bold">${data.sop_score}%</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-300">Peer Voting <span class="text-slate-500">(${data.auto_weights.peer_voting || 20}%)</span></span>
+                    <div class="text-right">
+                        <span class="block text-xs text-slate-500">${data.peer_votes_count} ratings</span>
+                        <span class="font-mono text-emerald-400 font-bold">${data.peer_score}%</span>
+                    </div>
+                </div>
+        `;
+        
+        if (data.manual_metrics && data.manual_metrics.length > 0) {
+            html += `<div class="h-px w-full bg-white/10 my-3"></div><p class="text-xs font-bold text-amber-400 mb-2">MANUAL METRICS (Grade below)</p>`;
+            data.manual_metrics.forEach(m => {
+                html += `
+                <div class="flex justify-between items-center text-sm mt-2">
+                    <span class="text-amber-200">${m.name} <span class="text-amber-500/50">(${m.weight}%)</span></span>
+                    <div class="flex items-center gap-2">
+                        <input type="number" class="form-input w-20 text-right py-1 px-2 text-sm bg-amber-500/10 border-amber-500/20 text-amber-400 focus:border-amber-400 manual-kpi-input" data-weight="${m.weight}" value="100" oninput="recalculateFinal()">
+                        <span class="text-xs text-slate-500">/ 100</span>
+                    </div>
+                </div>
+                `;
+            });
+        }
+        
+        html += `
+                <div class="h-px w-full bg-white/10 my-3"></div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-white font-bold">Final KPI Score</span>
+                    <span id="breakdown_final" class="font-mono text-white font-black bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-300">—</span>
+                </div>
+                
+                <div id="target_bonus_container"></div>
+            </div>
+        `;
+        breakdownDiv.innerHTML = html;
+        
+        recalculateFinal();
+        
+    } catch (err) {
+        alert("Failed to calculate payroll.");
+        console.error(err);
+    }
+}
+
+function recalculateFinal() {
+    if (!currentCalculationData) return;
+    
+    let manualContribution = 0;
+    document.querySelectorAll('.manual-kpi-input').forEach(input => {
+        const weight = parseFloat(input.getAttribute('data-weight') || 0);
+        const score = parseFloat(input.value || 0);
+        manualContribution += (score * (weight / 100));
+    });
+    
+    const finalKpi = currentCalculationData.auto_kpi_contribution + manualContribution;
+    document.getElementById('breakdown_final').textContent = `${finalKpi.toFixed(2)}%`;
+    
+    // Deduction Math (KPI-Linked Salary)
+    const baseSalary = currentCalculationData.base_salary;
+    const kpiLinkedPct = currentCalculationData.target_bonus_percentage || 100; // Using this setting as the % of salary tied to KPI
+    const kpiLinkedAmount = baseSalary * (kpiLinkedPct / 100);
+    
+    let deductions = 0;
+    if (finalKpi < 100) {
+        const missRatio = (100 - finalKpi) / 100.0;
+        deductions = kpiLinkedAmount * missRatio;
+    }
+    
+    // If they score over 100%, they get a bonus on the linked amount
+    let bonuses = 0;
+    if (finalKpi > 100) {
+        const overRatio = (finalKpi - 100) / 100.0;
+        bonuses = kpiLinkedAmount * overRatio;
+    }
+    
+    const targetHtml = `
+        <div class="h-px w-full bg-white/10 my-3"></div>
+        <div class="space-y-1">
+            <div class="flex justify-between items-center text-xs">
+                <span class="text-slate-400">KPI-Linked Salary (${kpiLinkedPct}%)</span>
+                <span class="text-slate-300 font-mono">$${kpiLinkedAmount.toFixed(2)}</span>
+            </div>
+            <div class="flex justify-between items-center text-xs">
+                <span class="text-rose-400">Calculated Deduction</span>
+                <span class="text-rose-400 font-mono">-$${deductions.toFixed(2)}</span>
+            </div>
+        </div>
+    `;
+    document.getElementById('target_bonus_container').innerHTML = targetHtml;
+    
+    document.getElementById('payroll_deductions').value = deductions.toFixed(2);
+    document.getElementById('payroll_bonus').value = bonuses.toFixed(2);
+}
+
+// KPI Settings Logic
+async function openKpiSettings() {
+    openModal('kpi-settings-modal');
+    try {
+        const res = await fetch('/api/kpi/settings');
+        const data = await res.json();
+        
+        document.getElementById('setting_target_bonus').value = data.target_bonus_percentage || 15;
+        document.getElementById('setting_att').value = data.auto_weights.attendance || 40;
+        document.getElementById('setting_punct').value = data.auto_weights.punctuality || 0;
+        document.getElementById('setting_sops').value = data.auto_weights.sops || 40;
+        document.getElementById('setting_peer').value = data.auto_weights.peer_voting || 20;
+        
+        const container = document.getElementById('manual_metrics_container');
+        container.innerHTML = '';
+        if (data.manual_metrics && data.manual_metrics.length > 0) {
+            data.manual_metrics.forEach(m => addManualMetric(m.name, m.weight));
+        } else {
+            addManualMetric();
+        }
+        updateTotalWeight();
+    } catch (e) { console.error(e); }
+}
+
+function addManualMetric(name = '', weight = 10) {
+    const div = document.createElement('div');
+    div.className = 'flex gap-2 items-center';
+    div.innerHTML = `
+        <input type="text" class="form-input flex-1 metric-name" placeholder="Metric Name (e.g. Hygiene)" value="${name}">
+        <input type="number" class="form-input w-24 metric-weight" placeholder="Weight %" value="${weight}" oninput="updateTotalWeight()">
+        <button type="button" onclick="this.parentElement.remove(); updateTotalWeight();" class="text-rose-400 hover:text-rose-300 px-2">✕</button>
+    `;
+    document.getElementById('manual_metrics_container').appendChild(div);
+    updateTotalWeight();
+}
+
+function updateTotalWeight() {
+    let total = 0;
+    total += parseFloat(document.getElementById('setting_att').value || 0);
+    total += parseFloat(document.getElementById('setting_punct').value || 0);
+    total += parseFloat(document.getElementById('setting_sops').value || 0);
+    total += parseFloat(document.getElementById('setting_peer').value || 0);
+    
+    document.querySelectorAll('.metric-weight').forEach(el => {
+        total += parseFloat(el.value || 0);
+    });
+    
+    const display = document.getElementById('total_weight_display');
+    display.textContent = `Total: ${total}%`;
+    if (total === 100) {
+        display.className = "text-xs font-bold text-emerald-400";
+    } else {
+        display.className = "text-xs font-bold text-amber-400";
+    }
+}
+
+async function saveKpiSettings() {
+    const manual_metrics = [];
+    document.querySelectorAll('#manual_metrics_container > div').forEach(div => {
+        const name = div.querySelector('.metric-name').value;
+        const weight = parseFloat(div.querySelector('.metric-weight').value || 0);
+        if (name && weight > 0) {
+            manual_metrics.push({ id: name.toLowerCase().replace(/[^a-z0-9]/g, '_'), name, weight });
+        }
+    });
+
+    const payload = {
+        target_bonus_percentage: parseFloat(document.getElementById('setting_target_bonus').value || 15),
+        auto_weights: {
+            attendance: parseFloat(document.getElementById('setting_att').value || 0),
+            punctuality: parseFloat(document.getElementById('setting_punct').value || 0),
+            sops: parseFloat(document.getElementById('setting_sops').value || 0),
+            peer_voting: parseFloat(document.getElementById('setting_peer').value || 0)
+        },
+        manual_metrics: manual_metrics
+    };
+
+    try {
+        await fetch('/api/kpi/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        closeModal('kpi-settings-modal');
+        alert("KPI Settings saved! New individual calculations will use these weights.");
+    } catch (e) { alert("Error saving settings."); console.error(e); }
+}
+</script>
+{% endblock %}

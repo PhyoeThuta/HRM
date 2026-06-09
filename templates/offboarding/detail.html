@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Offboarding: {{ emp.Full_name if emp else '—' }} — CorpHRM{% endblock %}
+{% block page_title %}Offboarding: {{ emp.Full_name if emp else '—' }}{% endblock %}
+{% block page_subtitle %}Asset clearance checklist & task tracking{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/offboarding" class="text-sm text-slate-400 hover:text-white flex items-center gap-1.5">← All Offboarding</a>
+  <span class="text-slate-600">|</span>
+  {% if not ei or ei.status != 'Completed' %}
+  <a href="/offboarding/{{ ob.id }}/exit-interview" class="text-sm font-semibold text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 px-3 py-1.5 rounded-xl">📋 Conduct Exit Interview →</a>
+  {% else %}
+  <span class="text-sm text-emerald-400 bg-emerald-400/10 px-3 py-1.5 rounded-xl">✓ Exit Interview Completed</span>
+  {% endif %}
+</div>
+
+<!-- Header -->
+<div class="rounded-2xl bg-surface-800 border border-white/5 p-6 mb-6">
+  <div class="flex items-start justify-between">
+    <div class="flex items-center gap-4">
+      <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-2xl font-black text-white">{{ (emp.Full_name or '?')[0] }}</div>
+      <div>
+        <h2 class="text-xl font-bold text-white">{{ emp.Full_name or '—' }}</h2>
+        <div class="flex items-center gap-3 mt-1 text-sm text-slate-400 flex-wrap">
+          <span class="font-mono text-indigo-400">{{ emp.employee_id or '—' }}</span>
+          <span>·</span><span>{{ ob.termination_reason or '—' }}</span>
+          <span>·</span><span>Exit: {{ ob.exit_type or '—' }}</span>
+          <span>·</span><span>Resignation: {{ ob.resignation_date or '—' }}</span>
+          <span>·</span><span class="font-semibold">Last Day: {{ ob.last_working_date or '—' }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="text-right">
+      {% set is_cleared = ob.settlement_status and ob.settlement_status.startswith('Release') %}
+      {% if is_cleared %}
+      <div class="bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-4 py-2.5 text-center">
+        <p class="text-sm font-bold text-emerald-400">✓ Release Final Settlement</p>
+        <p class="text-xs text-emerald-300/60">All cleared · Supabase updated</p>
+      </div>
+      {% else %}
+      <div class="bg-rose-500/15 border border-rose-500/30 rounded-xl px-4 py-2.5 text-center">
+        <p class="text-sm font-bold text-rose-400">⚠ Hold Final Payroll</p>
+        <p class="text-xs text-rose-300/60">{{ pct }}% tasks cleared</p>
+      </div>
+      {% endif %}
+      <div class="mt-2">
+        <p class="text-2xl font-black {{ 'text-emerald-400' if pct == 100 else 'text-rose-400' }}">{{ pct }}%</p>
+        <p class="text-xs text-slate-400">{{ done }}/{{ total }} tasks</p>
+        <div class="w-32 h-2 bg-white/5 rounded-full overflow-hidden mt-1 ml-auto"><div class="h-full rounded-full {{ 'bg-emerald-500' if pct == 100 else 'bg-rose-500' }}" style="width:{{ pct }}%"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Asset Clearance Toggles -->
+<div class="rounded-2xl bg-surface-800 border border-white/5 p-5 mb-6">
+  <h3 class="text-sm font-bold text-white mb-4">Asset & Compliance Clearance</h3>
+  <div class="grid grid-cols-4 gap-3" id="clearance-grid">
+    {% for field, label, icon in [
+      ("laptop_returned","Laptop Returned","💻"),
+      ("access_card_returned","Access Card","🪪"),
+      ("nda_signed","NDA Signed","📝"),
+      ("knowledge_transfer","Knowledge Transfer","🔄")
+    ] %}
+    {% set checked = ob.get(field, False) %}
+    <label class="clearance-item relative rounded-xl border {{ 'border-emerald-500/30 bg-emerald-500/5' if checked else 'border-white/10 bg-white/3' }} p-4 cursor-pointer transition-all duration-300" id="item-{{ ob.id }}-{{ field }}">
+      <div class="flex items-start justify-between mb-2">
+        <span class="text-2xl">{{ icon }}</span>
+        <div class="relative">
+          <input type="checkbox" class="sr-only peer" {{ 'checked' if checked else '' }}
+                 onchange="toggleClearance('{{ ob.id }}', '{{ field }}', this.checked)"/>
+          <div class="w-10 h-5 bg-white/10 peer-checked:bg-emerald-500 rounded-full transition-colors duration-300"></div>
+          <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300 peer-checked:translate-x-5"></div>
+        </div>
+      </div>
+      <p class="text-sm font-bold {{ 'text-emerald-400' if checked else 'text-slate-300' }}">{{ label }}</p>
+      <p class="text-xs {{ 'text-emerald-400/70' if checked else 'text-slate-500' }} mt-0.5">{{ '✓ Confirmed' if checked else '⏳ Pending' }}</p>
+    </label>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Offboarding Task Checklist by Category -->
+{% for cat, assignments in cat_groups.items() %}
+{% set cat_done = assignments|selectattr("status","equalto","Completed")|list|length %}
+<div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden mb-4">
+  <div class="px-5 py-3.5 border-b border-white/5 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      {% if cat == 'IT' %}<span class="text-cyan-400">💻</span>
+      {% elif cat == 'Finance' %}<span class="text-emerald-400">💰</span>
+      {% elif cat == 'Legal' %}<span class="text-rose-400">⚖️</span>
+      {% elif cat == 'Knowledge Transfer' %}<span class="text-amber-400">📚</span>
+      {% elif cat == 'Facilities' %}<span class="text-blue-400">🏢</span>
+      {% else %}<span class="text-slate-400">📌</span>{% endif %}
+      <h3 class="text-sm font-bold text-white">{{ cat }}</h3>
+    </div>
+    <span class="text-xs text-slate-400">{{ cat_done }}/{{ assignments|length }}</span>
+  </div>
+  <div class="divide-y divide-white/5">
+    {% for a in assignments %}
+    <div class="px-5 py-3.5 flex items-center justify-between {{ 'bg-emerald-500/3' if a.status == 'Completed' else '' }}">
+      <div class="flex items-center gap-3 flex-1">
+        {% if a.status == 'Completed' %}
+        <div class="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center flex-shrink-0"><svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>
+        {% else %}
+        <div class="w-6 h-6 rounded-full border border-white/20 flex-shrink-0"></div>
+        {% endif %}
+        <div>
+          <p class="text-sm font-medium {{ 'text-emerald-400 line-through' if a.status == 'Completed' else 'text-white' }}">{{ a.task_name }}</p>
+          <p class="text-xs text-slate-500">Owner: {{ a.responsible }}{% if a.notes %} · {{ a.notes }}{% endif %}</p>
+        </div>
+      </div>
+      {% if a.status != 'Completed' %}
+      <form method="post" action="/offboarding/{{ ob.id }}/task/{{ a.id }}/complete" class="flex items-center gap-2 ml-4">
+        <input type="text" name="notes" placeholder="Note..." class="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-slate-300 w-28"/>
+        <button type="submit" class="text-xs font-semibold text-emerald-400 bg-emerald-400/10 hover:bg-emerald-400/20 px-3 py-1.5 rounded-lg">Complete ✓</button>
+      </form>
+      {% else %}
+      <span class="text-xs text-slate-500 ml-4">{{ (a.completed_at or '')[:10] }}</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+{% if ob.hr_notes %}
+<div class="rounded-2xl bg-surface-800 border border-white/5 p-5 mt-4">
+  <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">HR Notes</h3>
+  <p class="text-sm text-slate-300">{{ ob.hr_notes }}</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const state = {
+  laptop_returned: {{ 'true' if ob.get('laptop_returned') else 'false' }},
+  access_card_returned: {{ 'true' if ob.get('access_card_returned') else 'false' }},
+  nda_signed: {{ 'true' if ob.get('nda_signed') else 'false' }},
+  knowledge_transfer: {{ 'true' if ob.get('knowledge_transfer') else 'false' }},
+};
+async function toggleClearance(id, field, value) {
+  state[field] = value;
+  const item = document.getElementById(`item-${id}-${field}`);
+  if (item) {
+    if (value) { item.classList.add('border-emerald-500/30','bg-emerald-500/5'); item.classList.remove('border-white/10','bg-white/3'); }
+    else { item.classList.remove('border-emerald-500/30','bg-emerald-500/5'); item.classList.add('border-white/10','bg-white/3'); }
+  }
+  try {
+    const res = await fetch('/api/offboarding/toggle', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id, field, value, all_checks: state })
+    });
+    const data = await res.json();
+    showToast(data.all_cleared ? '✅ All cleared — Final Settlement Released!' : `${label} updated`, data.all_cleared ? 'success' : 'info');
+  } catch(e) { console.warn(e); }
+}
+</script>
+{% endblock %}

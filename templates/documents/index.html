@@ -1,0 +1,112 @@
+{% extends "base.html" if is_hr_or_boss else "portal/base.html" %}
+{% block title %}Document Vault — CorpHRM{% endblock %}
+{% block page_title %}Document Vault{% endblock %}
+{% block page_subtitle %}Manage employee documents and digital signatures{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div class="flex gap-2">
+  </div>
+  {% if is_hr_or_boss %}
+  <button onclick="openModal('add-doc-modal')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
+    + Issue Document
+  </button>
+  {% endif %}
+</div>
+
+<div class="bg-surface-800 rounded-2xl border border-white/5 overflow-hidden">
+  <table class="w-full text-left text-sm whitespace-nowrap">
+    <thead class="bg-surface-900 border-b border-white/5 text-slate-400 text-xs uppercase tracking-wider">
+      <tr>
+        <th class="px-6 py-4 font-semibold">Document</th>
+        <th class="px-6 py-4 font-semibold">Employee</th>
+        <th class="px-6 py-4 font-semibold">Status</th>
+        <th class="px-6 py-4 font-semibold">Date</th>
+        <th class="px-6 py-4 font-semibold">Action</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-white/5 text-slate-300">
+      {% for d in docs %}
+      <tr class="hover:bg-white/[0.02] transition-colors">
+        <td class="px-6 py-4">
+          <div class="font-bold text-white">{{ d.title }}</div>
+          <div class="text-xs text-slate-500">{{ d.doc_type }}</div>
+        </td>
+        <td class="px-6 py-4">{{ d.employee_name }}</td>
+        <td class="px-6 py-4">
+          {% if 'Pending' in d.status %}
+          <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">Pending</span>
+          {% else %}
+          <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Signed</span>
+          {% endif %}
+        </td>
+        <td class="px-6 py-4">{{ d.created_at[:10] }}</td>
+        <td class="px-6 py-4">
+          <a href="/documents/{{ d.id }}" class="text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+            View
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          </a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">No documents found in vault.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_hr_or_boss %}
+<div id="add-doc-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('add-doc-modal')"></div>
+  <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-lg m-4">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <h2 class="text-base font-bold text-white">Issue Document</h2>
+      <button onclick="closeModal('add-doc-modal')" class="text-slate-400 hover:text-white">✕</button>
+    </div>
+    <form method="post" action="/documents/add" class="p-6 space-y-4">
+      <div>
+        <label class="form-label">Employee *</label>
+        <select name="employee_id" required class="form-input">
+          <option value="" class="bg-[#1e293b] text-white">Select Employee...</option>
+          {% for e in employees %}
+          <option value="{{ e.id }}" class="bg-[#1e293b] text-white">{{ e.Full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label">Document Type *</label>
+          <select name="doc_type" class="form-input" required>
+            <option value="Warning Notice" class="bg-[#1e293b] text-white">Warning Notice</option>
+            <option value="Offer Letter" class="bg-[#1e293b] text-white">Offer Letter</option>
+            <option value="Promotion Letter" class="bg-[#1e293b] text-white">Promotion Letter</option>
+            <option value="Leave Request" class="bg-[#1e293b] text-white">Leave Request</option>
+            <option value="Policy Acknowledgment" class="bg-[#1e293b] text-white">Policy Acknowledgment</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Title *</label>
+          <input type="text" name="title" required class="form-input" placeholder="e.g. First Warning"/>
+        </div>
+      </div>
+      <div class="mt-2">
+        <label class="form-label">Signature Workflow *</label>
+        <select name="signature_workflow" class="form-input" required>
+          <option value="hr_then_employee" class="bg-[#1e293b] text-white">HR Signs First, Then Employee Signs</option>
+          <option value="boss_then_hr" class="bg-[#1e293b] text-white">Boss Signs First, Then HR Signs (e.g. Promotion Letter)</option>
+          <option value="boss_then_hr_then_employee" class="bg-[#1e293b] text-white">Boss Signs First, Then HR Signs, Then Employee</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Content *</label>
+        <textarea name="content" rows="6" required class="form-input" placeholder="Enter document body..."></textarea>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeModal('add-doc-modal')" class="flex-1 text-sm text-slate-400 py-2.5 rounded-xl bg-white/5">Cancel</button>
+        <button type="submit" class="flex-1 text-sm font-semibold text-white py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700">Issue Document</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Careers - Join Our Team</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+  <!-- Header -->
+  <header class="bg-slate-800 border-b border-white/5 py-6 px-8 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-indigo-500/30">C</div>
+      <div>
+        <h1 class="text-xl font-bold">CorpHRM Careers</h1>
+        <p class="text-xs text-slate-400">Join our enterprise team today</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-5xl mx-auto py-12 px-8">
+    <div class="text-center mb-12">
+      <h2 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 mb-4">Open Positions</h2>
+      <p class="text-slate-400 max-w-2xl mx-auto">We're looking for passionate individuals to join our growing team. Browse our open positions below and apply today!</p>
+    </div>
+
+    {% if success %}
+    <div class="mb-8 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+      <span class="text-emerald-400 font-bold text-xl">✓</span>
+      <p class="text-emerald-300 font-medium">{{ success }}</p>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {% for pos in positions %}
+      <div class="bg-slate-800/50 border border-white/5 rounded-2xl p-6 hover:bg-slate-800 transition-colors flex flex-col h-full">
+        <div class="mb-4">
+          <h3 class="text-xl font-bold text-white mb-1">{{ pos.title }}</h3>
+          <div class="flex items-center gap-2 mb-3">
+            <span class="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-500/10 text-indigo-400">{{ pos.level }}</span>
+            <span class="text-slate-500 text-xs">•</span>
+            <span class="text-slate-400 text-xs">{{ pos.team_dept }}</span>
+          </div>
+          {% if pos.base_salary %}
+          <p class="text-emerald-400 text-sm font-semibold">{{ pos.base_salary | int }} MMK / yr</p>
+          {% endif %}
+        </div>
+        <div class="mt-auto pt-4 border-t border-white/5">
+          <a href="/careers/apply/{{ pos.id }}" class="block w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl text-center transition-colors">Apply Now</a>
+        </div>
+      </div>
+      {% else %}
+      <div class="col-span-full py-12 text-center text-slate-500">
+        <p>There are no open positions at this time. Please check back later.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </main>
+</body>
+</html>

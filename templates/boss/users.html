@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}User Accounts — Boss Panel{% endblock %}
+{% block page_title %}User Accounts 🔐{% endblock %}
+{% block page_subtitle %}Manage system access — create accounts, assign roles, reset passwords{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <!-- Create User Form -->
+  <div class="lg:col-span-1">
+    <div class="rounded-2xl bg-surface-800 border border-indigo-500/15 p-5 sticky top-24">
+      <h2 class="text-sm font-bold text-white mb-4">Create New Account</h2>
+      <form method="post" action="/boss/users/add" class="space-y-3">
+        <div><label class="form-label">Full Name</label><input type="text" name="full_name" class="form-input" placeholder="Display name"/></div>
+        <div><label class="form-label">Username *</label><input type="text" name="username" required class="form-input" placeholder="login username"/></div>
+        <div><label class="form-label">Password *</label><input type="password" name="password" required class="form-input" placeholder="Initial password"/></div>
+        <div>
+          <label class="form-label">Role *</label>
+          <select name="role" class="form-input">
+            <option value="employee">Employee (Portal only)</option>
+            <option value="hr_manager">HR Manager (Admin)</option>
+            <option value="general_manager">General Manager (Admin)</option>
+            <option value="boss">Boss (Full Access)</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Link to Employee Record</label>
+          <select name="employee_id" class="form-input">
+            <option value="">— Optional —</option>
+            {% for e in employees %}
+            <option value="{{ e.id }}">{{ e.Full_name }} ({{ e.employee_id or '' }})</option>
+            {% endfor %}
+          </select>
+          <p class="text-[10px] text-slate-500 mt-1">Link employee accounts so they can see their own data in the portal.</p>
+        </div>
+        <button type="submit" class="w-full text-sm font-bold text-white py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition-colors">Create Account</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- User Table -->
+  <div class="lg:col-span-2">
+    <div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+      <div class="px-5 py-4 border-b border-white/5">
+        <h2 class="text-sm font-bold text-white">All System Users ({{ sys_users|length }})</h2>
+      </div>
+      <div class="divide-y divide-white/5">
+        {% for u in sys_users %}
+        {% set role_clr = {'boss':'amber','hr_manager':'indigo','general_manager':'cyan','employee':'slate'}[u.role] if u.role in ['boss','hr_manager','general_manager','employee'] else 'slate' %}
+        <div class="px-5 py-4">
+          <div class="flex items-start gap-4">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-base font-bold flex-shrink-0
+              {% if u.role == 'boss' %}bg-amber-500/15 text-amber-400
+              {% elif u.role == 'hr_manager' %}bg-indigo-500/15 text-indigo-400
+              {% elif u.role == 'general_manager' %}bg-cyan-500/15 text-cyan-400
+              {% else %}bg-white/5 text-slate-400{% endif %}">
+              {{ (u.full_name or u.username or 'U')[0] }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="font-semibold text-white text-sm">{{ u.full_name or u.username }}</span>
+                <span class="font-mono text-xs text-slate-500">@{{ u.username }}</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full capitalize
+                  {% if u.role == 'boss' %}text-amber-400 bg-amber-400/10
+                  {% elif u.role == 'hr_manager' %}text-indigo-400 bg-indigo-400/10
+                  {% elif u.role == 'general_manager' %}text-cyan-400 bg-cyan-400/10
+                  {% else %}text-slate-400 bg-white/5{% endif %}">
+                  {% if u.role == 'boss' %}👑{% elif u.role == 'hr_manager' %}🧑‍💼{% elif u.role == 'general_manager' %}🏢{% else %}👤{% endif %}
+                  {{ (u.role or '').replace('_',' ') }}
+                </span>
+                {% if not u.is_active %}
+                <span class="text-xs text-rose-400 bg-rose-400/10 px-2 py-0.5 rounded-full">Inactive</span>
+                {% endif %}
+              </div>
+              <p class="text-xs text-slate-500">Created {{ (u.created_at or '')[:10] }}</p>
+            </div>
+            <!-- Actions -->
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <!-- Toggle active -->
+              <form method="post" action="/boss/users/{{ u.id }}/toggle">
+                <input type="hidden" name="is_active" value="{{ 'false' if u.is_active else 'true' }}"/>
+                <button type="submit" class="text-xs {% if u.is_active %}text-amber-400 bg-amber-500/10 hover:bg-amber-500/20{% else %}text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20{% endif %} px-2.5 py-1.5 rounded-lg transition-colors">
+                  {{ 'Deactivate' if u.is_active else 'Activate' }}
+                </button>
+              </form>
+              <!-- Reset password -->
+              <button onclick="openModal('reset-{{ u.id }}')" class="text-xs text-slate-400 bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg transition-colors">Reset PW</button>
+              
+              <!-- Delete -->
+              <button type="button" onclick="openModal('delete-{{ u.id }}')" class="text-xs text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-lg transition-colors">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reset Password Modal -->
+        <div id="reset-{{ u.id }}" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('reset-{{ u.id }}')"></div>
+          <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-sm m-4 p-6">
+            <h3 class="text-base font-bold text-white mb-1">Reset Password</h3>
+            <p class="text-xs text-slate-400 mb-4">For <span class="text-indigo-400">@{{ u.username }}</span></p>
+            <form method="post" action="/boss/users/{{ u.id }}/reset-password" class="space-y-3">
+              <input type="password" name="new_password" required class="form-input" placeholder="New password"/>
+              <div class="flex gap-3">
+                <button type="button" onclick="closeModal('reset-{{ u.id }}')" class="flex-1 text-sm text-slate-400 py-2 rounded-xl bg-white/5">Cancel</button>
+                <button type="submit" class="flex-1 text-sm font-semibold text-white py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700">Reset</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <!-- Delete Confirmation Modal -->
+        <div id="delete-{{ u.id }}" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('delete-{{ u.id }}')"></div>
+          <div class="relative bg-surface-850 border border-rose-500/30 rounded-2xl w-full max-w-sm m-4 p-6">
+            <div class="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-400 text-2xl mx-auto mb-4">
+              ⚠️
+            </div>
+            <h3 class="text-lg font-bold text-white mb-2 text-center">Delete Account?</h3>
+            <p class="text-sm text-slate-400 mb-6 text-center">Are you sure you want to permanently delete the account for <span class="text-rose-400 font-semibold">@{{ u.username }}</span>? This action cannot be undone and will revoke their access to the system immediately.</p>
+            <form method="post" action="/boss/users/{{ u.id }}/delete" class="flex gap-3">
+              <button type="button" onclick="closeModal('delete-{{ u.id }}')" class="flex-1 text-sm font-semibold text-slate-300 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">Cancel</button>
+              <button type="submit" class="flex-1 text-sm font-bold text-white py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-500/20 transition-all">Yes, Delete</button>
+            </form>
+          </div>
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-slate-500 text-sm">No users yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

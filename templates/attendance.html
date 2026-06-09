@@ -1,0 +1,745 @@
+{% extends "base.html" %}
+{% block title %}Attendance — CorpHRM{% endblock %}
+{% block page_title %}Attendance Management{% endblock %}
+{% block page_subtitle %}{{ today }} · Manual · Photo Selfie · QR Code · Biometric{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  {% for label, val, clr in [
+    ("Total Records", records|length, "indigo"),
+    ("Present Today", records|selectattr("check_in")|list|length, "emerald"),
+    ("Late Arrivals", records|selectattr("is_late")|list|length, "amber"),
+    ("Still In Office", records|rejectattr("check_out")|selectattr("check_in")|list|length, "cyan")
+  ] %}
+  <div class="rounded-2xl bg-surface-800 border border-{{ clr }}-500/20 p-4 flex items-center gap-4">
+    <p class="text-2xl font-black text-white">{{ val }}</p>
+    <p class="text-xs text-slate-400">{{ label }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Tabs -->
+<div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden mb-6">
+  <div class="flex items-center border-b border-white/5 overflow-x-auto">
+    {% for tab_id, icon, label in [
+      ("tab-manual","✏️","Manual Entry"),
+      ("tab-photo","📸","Photo Check-In"),
+      ("tab-qr","📱","QR Code"),
+      ("tab-biometric","👆","Biometric")
+    ] %}
+    <button onclick="switchTab('{{ tab_id }}')" id="btn-{{ tab_id }}"
+      class="tab-btn flex items-center gap-2 px-5 py-4 text-sm font-semibold whitespace-nowrap border-b-2 transition-all duration-200
+        {% if loop.first %}border-indigo-500 text-white{% else %}border-transparent text-slate-400 hover:text-white{% endif %}">
+      <span>{{ icon }}</span> {{ label }}
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- TAB 1: Manual Entry -->
+  <div id="tab-manual" class="tab-pane p-6">
+    <form method="post" action="/attendance/add" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="md:col-span-2">
+        <label class="form-label">Employee *</label>
+        <select name="employee_id" required class="form-input">
+          <option value="">— Select Employee —</option>
+          {% for emp in employees %}
+          <option value="{{ emp.id }}">{{ emp.Full_name }} ({{ emp.employee_id }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Check-In Time</label>
+        <input type="datetime-local" name="check_in" class="form-input"/>
+      </div>
+      <div>
+        <label class="form-label">Check-Out Time</label>
+        <input type="datetime-local" name="check_out" class="form-input"/>
+      </div>
+      <div>
+        <label class="form-label">Overtime (Hours)</label>
+        <input type="number" step="0.5" min="0" name="overtime_hours" class="form-input" placeholder="e.g. 2.5"/>
+      </div>
+      <div class="flex items-center gap-6 pt-2">
+        <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+          <input type="checkbox" name="is_late" value="true" class="rounded accent-amber-500"/>
+          <span>Mark as Late Arrival</span>
+        </label>
+      </div>
+      <input type="hidden" name="attendance_method" value="Manual"/>
+      <div class="md:col-span-2">
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
+          ✏️ Record Manual Attendance
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- TAB 2: Photo Check-In -->
+  <div id="tab-photo" class="tab-pane p-6 hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Camera -->
+      <div class="flex flex-col gap-4">
+        <div class="relative bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-white/10">
+          <video id="webcam-video" class="w-full h-full object-cover hidden" autoplay playsinline muted></video>
+          <canvas id="webcam-canvas" class="w-full h-full object-cover hidden"></canvas>
+          <div id="camera-placeholder" class="text-center">
+            <div class="text-5xl mb-3">📸</div>
+            <p class="text-slate-400 text-sm">Camera preview will appear here</p>
+          </div>
+          <!-- Live indicator -->
+          <div id="live-badge" class="absolute top-3 left-3 hidden items-center gap-1.5 bg-black/60 rounded-full px-3 py-1">
+            <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+            <span class="text-xs text-white font-bold">LIVE</span>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <button type="button" onclick="startCamera()" id="btn-start-cam"
+            class="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            Start Camera
+          </button>
+          <button type="button" onclick="capturePhoto()" id="btn-capture" disabled
+            class="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
+            Capture
+          </button>
+          <button type="button" onclick="retakePhoto()" id="btn-retake" class="hidden bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
+            Retake
+          </button>
+        </div>
+        <!-- File upload fallback -->
+        <div class="border-t border-white/5 pt-4">
+          <p class="text-xs text-slate-500 mb-2 text-center">— or upload from device —</p>
+          <label class="block cursor-pointer">
+            <input type="file" id="file-upload" accept="image/*" capture="camera" onchange="loadUploadedFile(event)" class="sr-only"/>
+            <div class="border-2 border-dashed border-white/10 rounded-xl p-4 text-center hover:border-indigo-500/50 transition-colors">
+              <span class="text-xs text-slate-400">📁 Browse / Camera Roll</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Form -->
+      <form id="photo-form" method="post" action="/attendance/add-photo" class="space-y-4">
+        <input type="hidden" name="attendance_method" value="Photo"/>
+        <input type="hidden" name="photo_b64" id="photo-b64"/>
+        <div>
+          <label class="form-label">Employee *</label>
+          <select name="employee_id" required class="form-input">
+            <option value="">— Select Employee —</option>
+            {% for emp in employees %}
+            <option value="{{ emp.id }}">{{ emp.Full_name }} ({{ emp.employee_id }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Check-In Notes</label>
+          <input type="text" name="notes" class="form-input" placeholder="e.g. Working from office — Floor 3"/>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="late-photo" name="is_late" value="true" class="accent-amber-500"/>
+          <label for="late-photo" class="text-xs text-slate-400">Mark as Late Arrival</label>
+        </div>
+
+        <!-- Photo preview indicator -->
+        <div id="photo-status" class="rounded-xl bg-white/5 border border-white/10 p-3 text-center hidden">
+          <p class="text-xs text-emerald-400 font-semibold">✅ Photo captured — ready to submit</p>
+        </div>
+        <div id="no-photo-warning" class="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-center">
+          <p class="text-xs text-amber-400">📸 Please capture a photo before submitting</p>
+        </div>
+
+        <button type="submit" onclick="return validatePhoto()" 
+          class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
+          📸 Submit Check-In / Check-Out
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- TAB 3: QR Code -->
+  <div id="tab-qr" class="tab-pane p-6 hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="space-y-4">
+        <p class="text-sm text-slate-300 leading-relaxed">HR generates a unique QR code per employee. The employee scans it from any device to auto-check in. Each code is valid for <span class="text-cyan-400 font-semibold">8 hours</span> and can only be used <span class="text-cyan-400 font-semibold">once</span>.</p>
+        <form method="post" action="/attendance/generate-qr" class="space-y-3">
+          <div>
+            <label class="form-label">Select Employee *</label>
+            <select name="employee_id" required class="form-input">
+              <option value="">— Select Employee —</option>
+              {% for emp in employees %}
+              <option value="{{ emp.id }}">{{ emp.Full_name }} ({{ emp.employee_id }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+            📱 Generate QR Code
+          </button>
+        </form>
+        {% if qr_data %}
+        <div class="mt-4 flex flex-col items-center gap-3 bg-white rounded-2xl p-6">
+          <img src="data:image/png;base64,{{ qr_data.image_b64 }}" class="w-44 h-44" alt="QR"/>
+          <p class="text-sm font-bold text-gray-800">{{ qr_data.emp_name }}</p>
+          <p class="text-xs text-gray-500">{{ qr_data.emp_code }} · Expires {{ qr_data.expires_at }}</p>
+        </div>
+        {% endif %}
+      </div>
+      <!-- Active tokens -->
+      <div>
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Active QR Tokens</h3>
+        {% if active_tokens %}
+        <div class="space-y-2">
+          {% for tok in active_tokens %}
+          <div class="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+            <div>
+              <p class="text-sm font-medium text-white">{{ tok.Full_name }}</p>
+              <p class="text-xs font-mono text-cyan-400">{{ tok.token[:16] }}...</p>
+            </div>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full {{ 'text-emerald-400 bg-emerald-400/10' if tok.used else 'text-amber-400 bg-amber-400/10 animate-pulse' }}">
+              {{ '✓ Used' if tok.used else 'Active' }}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-xl bg-white/5 p-8 text-center text-slate-500 text-sm">No QR tokens generated yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: Biometric -->
+  <div id="tab-biometric" class="tab-pane p-6 hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Register Device -->
+      <div class="space-y-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">🖥️ Register Biometric Device</h3>
+        <form method="post" action="/attendance/biometric/device/add" class="space-y-3">
+          <div>
+            <label class="form-label">Device Name *</label>
+            <input name="device_name" required class="form-input" placeholder="e.g. ZKTeco Main Entrance"/>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="form-label">IP Address</label>
+              <input name="ip_address" class="form-input" placeholder="192.168.1.100"/>
+            </div>
+            <div>
+              <label class="form-label">Port</label>
+              <input name="port" class="form-input" value="4370" type="number"/>
+            </div>
+          </div>
+          <div>
+            <label class="form-label">Location</label>
+            <input name="location" class="form-input" placeholder="Floor 1 — Main Entrance"/>
+          </div>
+          <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+            + Register Device
+          </button>
+        </form>
+
+        <!-- Device List -->
+        {% if biometric_devices %}
+        <div class="mt-2 space-y-2">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Registered Devices ({{ biometric_devices|length }})</p>
+          {% for dev in biometric_devices %}
+          <div class="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+            <div>
+              <p class="text-sm font-semibold text-white">{{ dev.device_name }}</p>
+              <p class="text-xs text-slate-500 font-mono">{{ dev.ip_address }}:{{ dev.port }}</p>
+              <p class="text-xs text-slate-500">📍 {{ dev.location or '—' }}</p>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full font-semibold {{ 'text-emerald-400 bg-emerald-400/10' if dev.status == 'Active' else 'text-slate-400 bg-white/5' }}">
+              {{ '● Active' if dev.status == 'Active' else dev.status }}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-xl bg-white/5 p-6 text-center text-slate-500 text-sm">No devices registered yet.</div>
+        {% endif %}
+      </div>
+
+      <!-- Register Employee Fingerprint ID -->
+      <div class="space-y-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">🖐️ Map Employee to Device</h3>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          When you enroll an employee on the physical device, it assigns them an ID number. Record that ID here so the system knows which attendance records belong to which employee when the device syncs.
+        </p>
+        <form method="post" action="/attendance/biometric/register" class="space-y-3">
+          <div>
+            <label class="form-label">Employee *</label>
+            <select name="employee_id" required class="form-input">
+              <option value="">— Select Employee —</option>
+              {% for emp in employees %}
+              <option value="{{ emp.id }}">{{ emp.Full_name }} ({{ emp.employee_id }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Device *</label>
+            <select name="device_id" required class="form-input">
+              <option value="">— Select Device —</option>
+              {% for dev in biometric_devices %}
+              <option value="{{ dev.id }}">{{ dev.device_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Biometric ID on Device *</label>
+            <input name="biometric_id" required class="form-input" placeholder="e.g. 001"/>
+            <p class="text-xs text-slate-500 mt-1">The employee's enrolment ID as shown on the device</p>
+          </div>
+          <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+            🖐️ Save Mapping
+          </button>
+        </form>
+
+        <!-- Registered employees table -->
+        {% if biometric_registrations %}
+        <div class="mt-2 space-y-2">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Enrolled Employees ({{ biometric_registrations|length }})</p>
+          {% for reg in biometric_registrations %}
+          <div class="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-xs font-bold text-white">
+                {{ (reg.Full_name or '?')[0] }}
+              </div>
+              <div>
+                <p class="text-sm font-medium text-white">{{ reg.Full_name }}</p>
+                <p class="text-xs text-slate-500">Device ID: <span class="font-mono text-purple-400">{{ reg.biometric_id }}</span></p>
+              </div>
+            </div>
+            <span class="text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-2.5 py-1 rounded-full">
+              ✓ Enrolled
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- How it works note -->
+        <div class="rounded-xl bg-purple-500/5 border border-purple-500/20 p-4 mt-4">
+          <p class="text-xs font-bold text-purple-400 mb-2">ℹ️ How Biometric Attendance Works</p>
+          <ul class="text-xs text-slate-400 space-y-1.5 leading-relaxed">
+            <li>1. Employee places their finger on the physical scanner</li>
+            <li>2. The device verifies the fingerprint & logs the timestamp</li>
+            <li>3. The device syncs log data to this system automatically via its network API</li>
+            <li>4. Attendance records appear in the register below tagged as <span class="text-purple-400 font-semibold">👆 Bio</span></li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Attendance Records Table -->
+<div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+  <div class="px-6 py-4 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h2 class="text-sm font-bold text-white">Attendance Register</h2>
+      <p class="text-xs text-slate-400 mt-0.5"><span id="visible-record-count">{{ records|length }}</span> / {{ records|length }} records</p>
+    </div>
+    
+    <!-- Filter Bar -->
+    <div class="flex items-center gap-3">
+      <button onclick="exportToCSV()" class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 border border-white/10 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
+        📥 Export CSV
+      </button>
+      <div class="relative">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+        <input type="text" id="filter-name" onkeyup="filterAttendance()" placeholder="Search employee..." class="bg-surface-850 border border-white/10 text-white text-xs rounded-lg pl-8 pr-3 py-2 w-40 focus:outline-none focus:border-indigo-500 transition-colors">
+      </div>
+      <input type="date" id="filter-date" onchange="filterAttendance()" class="bg-surface-850 border border-white/10 text-slate-300 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors">
+      <select id="filter-status" onchange="filterAttendance()" class="bg-surface-850 border border-white/10 text-slate-300 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition-colors">
+        <option value="all">All Status</option>
+        <option value="late">Late</option>
+        <option value="ontime">On Time</option>
+      </select>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-surface-850">
+        <tr>
+          <th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white select-none" onclick="sortTable(0)">Employee <span id="sort-icon-0"></span></th>
+          <th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider select-none">Photo</th>
+          <th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white select-none" onclick="sortTable(2)">Check In <span id="sort-icon-2"></span></th>
+          <th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white select-none" onclick="sortTable(3)">Check Out <span id="sort-icon-3"></span></th>
+          <th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white select-none" onclick="sortTable(4)">Method <span id="sort-icon-4"></span></th>
+          <th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white select-none" onclick="sortTable(5)">Hours <span id="sort-icon-5"></span></th>
+          <th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white select-none" onclick="sortTable(6)">Overtime <span id="sort-icon-6"></span></th>
+          <th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white select-none" onclick="sortTable(7)">Late <span id="sort-icon-7"></span></th>
+          <th class="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider select-none">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5" id="attendance-tbody">
+        {% for rec in records %}
+        <tr class="attendance-row hover:bg-white/2 transition-colors" 
+            data-emp="{{ rec.Full_name|lower if rec.Full_name else '' }}" 
+            data-date="{{ rec.check_in[:10] if rec.check_in else '' }}" 
+            data-status="{{ 'late' if rec.is_late else 'ontime' }}">
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">{{ (rec.Full_name or '?')[0] }}</div>
+              <div>
+                <p class="font-medium text-white text-sm">{{ rec.Full_name or '—' }}</p>
+                <p class="text-xs text-slate-500 font-mono">{{ rec.employee_code or '—' }}</p>
+              </div>
+            </div>
+          </td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-2">
+              {% if rec.check_in_photo_url %}
+              <button onclick="showPhoto('{{ rec.check_in_photo_url }}')" class="w-10 h-10 rounded-lg overflow-hidden border border-white/10 hover:border-indigo-500/50 transition-colors relative group">
+                <img src="{{ rec.check_in_photo_url }}" class="w-full h-full object-cover" alt="Check-in"/>
+                <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span class="text-[10px] font-bold text-white">IN</span></div>
+              </button>
+              {% endif %}
+              {% if rec.check_out_photo_url %}
+              <button onclick="showPhoto('{{ rec.check_out_photo_url }}')" class="w-10 h-10 rounded-lg overflow-hidden border border-white/10 hover:border-rose-500/50 transition-colors relative group">
+                <img src="{{ rec.check_out_photo_url }}" class="w-full h-full object-cover" alt="Check-out"/>
+                <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><span class="text-[10px] font-bold text-white">OUT</span></div>
+              </button>
+              {% endif %}
+              {% if not rec.check_in_photo_url and not rec.check_out_photo_url %}
+              <span class="text-slate-600 text-xs">—</span>
+              {% endif %}
+            </div>
+          </td>
+          <td class="py-3 px-4">
+            {% if rec.check_in %}<span class="text-emerald-400 font-mono text-xs">{{ rec.check_in[:16]|replace('T',' ') }}</span>
+            {% else %}<span class="text-slate-500">—</span>{% endif %}
+          </td>
+          <td class="py-3 px-4">
+            {% if rec.check_out %}<span class="text-rose-400 font-mono text-xs">{{ rec.check_out[:16]|replace('T',' ') }}</span>
+            {% else %}
+            <form method="post" action="/attendance/{{ rec.id }}/checkout">
+              <button type="submit" class="text-xs text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 px-2 py-0.5 rounded-lg">Check Out</button>
+            </form>
+            {% endif %}
+          </td>
+          <td class="py-3 px-4">
+            {% set m = rec.attendance_method or 'Manual' %}
+            {% if m == 'QR' %}<span class="text-xs font-medium text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded-full">📱 QR</span>
+            {% elif m == 'Biometric' %}<span class="text-xs font-medium text-purple-400 bg-purple-400/10 px-2 py-0.5 rounded-full">👆 Bio</span>
+            {% elif m == 'Photo' %}<span class="text-xs font-medium text-pink-400 bg-pink-400/10 px-2 py-0.5 rounded-full">📸 Photo</span>
+            {% else %}<span class="text-xs text-slate-400">✏️ Manual</span>{% endif %}
+          </td>
+          <td class="py-3 px-4"><span class="font-mono text-white text-xs">{% if rec.work_hours_calc is not none %}{{ rec.work_hours_calc }}h{% else %}—{% endif %}</span></td>
+          <td class="py-3 px-4"><span class="font-mono text-white text-xs">{% if rec.overtime_hours %}{{ rec.overtime_hours }}h{% else %}—{% endif %}</span></td>
+          <td class="py-3 px-4">
+            {% if rec.is_late %}<span class="text-xs font-semibold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">Late</span>
+            {% else %}<span class="text-xs text-emerald-400">On time</span>{% endif %}
+          </td>
+          <td class="py-3 px-4">
+            <form method="post" action="/attendance/{{ rec.id }}/delete" onsubmit="return confirm('Delete?')">
+              <button type="submit" class="text-xs text-rose-400 hover:text-rose-300 bg-rose-500/10 px-2 py-1 rounded-lg">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="py-12 text-center text-slate-500 text-sm">No attendance records yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Pagination Controls -->
+  <div class="px-6 py-4 border-t border-white/5 flex items-center justify-between" id="pagination-controls" style="display: none;">
+    <span class="text-xs text-slate-400" id="pagination-info"></span>
+    <div class="flex gap-2">
+      <button onclick="prevPage()" class="bg-surface-850 hover:bg-white/5 border border-white/10 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">Prev</button>
+      <button onclick="nextPage()" class="bg-surface-850 hover:bg-white/5 border border-white/10 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo Viewer Modal -->
+<div id="photo-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal('photo-modal')"></div>
+  <div class="relative max-w-sm w-full m-4">
+    <img id="photo-modal-img" src="" class="w-full rounded-2xl shadow-2xl" alt="Check-in photo"/>
+    <button onclick="closeModal('photo-modal')" class="absolute top-3 right-3 w-8 h-8 bg-black/60 rounded-full flex items-center justify-center text-white text-sm hover:bg-black/80">✕</button>
+    <div class="absolute bottom-3 left-3 bg-black/60 px-3 py-1 rounded-full">
+      <p class="text-xs text-white font-semibold">Check-In Photo</p>
+    </div>
+  </div>
+</div>
+
+<!-- QR Check-In result modal -->
+<div id="qr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeModal('qr-modal')"></div>
+  <div class="relative bg-white rounded-3xl p-8 text-center m-4 shadow-2xl max-w-xs w-full">
+    <h3 class="text-lg font-bold text-gray-800 mb-1" id="qr-modal-name"></h3>
+    <p class="text-xs text-gray-500 mb-4" id="qr-modal-meta"></p>
+    <div id="qr-modal-img" class="w-48 h-48 bg-gray-100 rounded-xl mx-auto mb-4"></div>
+    <button onclick="closeModal('qr-modal')" class="mt-2 text-sm text-indigo-600 font-semibold hover:underline">Close</button>
+  </div>
+</div>
+
+<script>
+let currentPage = 1;
+const pageSize = 10;
+let sortColIndex = null;
+let sortAsc = true;
+let filteredRows = [];
+
+function filterAttendance() {
+  const nameQuery = document.getElementById('filter-name').value.toLowerCase();
+  const dateQuery = document.getElementById('filter-date').value;
+  const statusQuery = document.getElementById('filter-status').value;
+  
+  const allRows = Array.from(document.querySelectorAll('.attendance-row'));
+  
+  // Filter
+  filteredRows = allRows.filter(row => {
+    const emp = row.getAttribute('data-emp') || '';
+    const date = row.getAttribute('data-date') || '';
+    const status = row.getAttribute('data-status') || '';
+    
+    const matchesName = !nameQuery || emp.includes(nameQuery);
+    const matchesDate = !dateQuery || date === dateQuery;
+    const matchesStatus = statusQuery === 'all' || status === statusQuery;
+    
+    return matchesName && matchesDate && matchesStatus;
+  });
+  
+  // Sort
+  if (sortColIndex !== null) {
+    filteredRows.sort((a, b) => {
+      const aVal = a.cells[sortColIndex].innerText.trim().toLowerCase();
+      const bVal = b.cells[sortColIndex].innerText.trim().toLowerCase();
+      // Handle empty values
+      if (aVal === '—' && bVal !== '—') return 1;
+      if (bVal === '—' && aVal !== '—') return -1;
+      
+      if (aVal < bVal) return sortAsc ? -1 : 1;
+      if (aVal > bVal) return sortAsc ? 1 : -1;
+      return 0;
+    });
+  }
+  
+  // Update UI headers
+  for (let i = 0; i < 8; i++) {
+    const icon = document.getElementById(`sort-icon-${i}`);
+    if (icon) icon.innerText = (i === sortColIndex) ? (sortAsc ? ' ▲' : ' ▼') : '';
+  }
+  
+  // Re-append sorted rows
+  const tbody = document.getElementById('attendance-tbody');
+  filteredRows.forEach(row => tbody.appendChild(row));
+  
+  currentPage = 1;
+  renderPagination();
+}
+
+function sortTable(colIndex) {
+  if (sortColIndex === colIndex) {
+    sortAsc = !sortAsc;
+  } else {
+    sortColIndex = colIndex;
+    sortAsc = true;
+  }
+  filterAttendance();
+}
+
+function prevPage() {
+  if (currentPage > 1) {
+    currentPage--;
+    renderPagination();
+  }
+}
+
+function nextPage() {
+  const maxPage = Math.ceil(filteredRows.length / pageSize);
+  if (currentPage < maxPage) {
+    currentPage++;
+    renderPagination();
+  }
+}
+
+function renderPagination() {
+  const allRows = document.querySelectorAll('.attendance-row');
+  allRows.forEach(row => row.style.display = 'none');
+  
+  const start = (currentPage - 1) * pageSize;
+  const end = start + pageSize;
+  
+  for (let i = start; i < end && i < filteredRows.length; i++) {
+    filteredRows[i].style.display = '';
+  }
+  
+  document.getElementById('visible-record-count').innerText = filteredRows.length;
+  
+  const controls = document.getElementById('pagination-controls');
+  if (filteredRows.length > pageSize) {
+    controls.style.display = 'flex';
+    document.getElementById('pagination-info').innerText = `Showing ${start + 1} to ${Math.min(end, filteredRows.length)} of ${filteredRows.length} entries`;
+  } else {
+    controls.style.display = 'none';
+  }
+}
+
+// Default to today's date on load
+document.addEventListener('DOMContentLoaded', () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const localToday = `${year}-${month}-${day}`;
+  document.getElementById('filter-date').value = localToday;
+  filterAttendance();
+});
+
+function exportToCSV() {
+  const rows = document.querySelectorAll('#attendance-tbody tr');
+  let csvContent = "data:text/csv;charset=utf-8,";
+  
+  // Add headers
+  csvContent += "Employee,Check In,Check Out,Method,Hours,Overtime,Status\n";
+  
+  rows.forEach(row => {
+    if (row.style.display !== 'none') {
+      const cols = row.querySelectorAll('td');
+      if (cols.length >= 8) {
+        // Extract text from columns (ignoring photo and action columns)
+        const empName = cols[0].innerText.replace(/\n/g, ' ').trim();
+        const checkIn = cols[2].innerText.trim();
+        const checkOut = cols[3].innerText.trim();
+        const method = cols[4].innerText.trim();
+        const hours = cols[5].innerText.trim();
+        const overtime = cols[6].innerText.trim();
+        const status = cols[7].innerText.trim();
+        
+        // Escape commas and quotes for CSV
+        const rowArray = [empName, checkIn, checkOut, method, hours, overtime, status].map(t => `"${t}"`);
+        csvContent += rowArray.join(",") + "\n";
+      }
+    }
+  });
+  
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `attendance_report_${document.getElementById('filter-date').value || 'all'}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Tab Switching ───────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('border-indigo-500','text-white');
+    b.classList.add('border-transparent','text-slate-400');
+  });
+  document.getElementById(id).classList.remove('hidden');
+  const btn = document.getElementById('btn-' + id);
+  btn.classList.remove('border-transparent','text-slate-400');
+  btn.classList.add('border-indigo-500','text-white');
+}
+
+// ── Webcam / Camera ─────────────────────────────────────────
+let stream = null;
+let capturedDataUrl = null;
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 }, audio: false });
+    const video = document.getElementById('webcam-video');
+    video.srcObject = stream;
+    video.classList.remove('hidden');
+    document.getElementById('camera-placeholder').classList.add('hidden');
+    document.getElementById('webcam-canvas').classList.add('hidden');
+    document.getElementById('live-badge').classList.remove('hidden');
+    document.getElementById('live-badge').classList.add('flex');
+    document.getElementById('btn-capture').disabled = false;
+    document.getElementById('btn-start-cam').textContent = '🔄 Restart';
+  } catch(e) {
+    alert('Camera not available: ' + e.message + '\nUse the file upload below instead.');
+  }
+}
+
+function capturePhoto() {
+  const video  = document.getElementById('webcam-video');
+  const canvas = document.getElementById('webcam-canvas');
+  const ctx    = canvas.getContext('2d');
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  ctx.drawImage(video, 0, 0);
+  capturedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+  canvas.classList.remove('hidden');
+  video.classList.add('hidden');
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  document.getElementById('live-badge').classList.add('hidden');
+  document.getElementById('photo-b64').value = capturedDataUrl;
+  document.getElementById('photo-status').classList.remove('hidden');
+  document.getElementById('no-photo-warning').classList.add('hidden');
+  document.getElementById('btn-retake').classList.remove('hidden');
+  document.getElementById('btn-capture').disabled = true;
+}
+
+function retakePhoto() {
+  const canvas = document.getElementById('webcam-canvas');
+  canvas.classList.add('hidden');
+  capturedDataUrl = null;
+  document.getElementById('photo-b64').value = '';
+  document.getElementById('photo-status').classList.add('hidden');
+  document.getElementById('no-photo-warning').classList.remove('hidden');
+  document.getElementById('btn-retake').classList.add('hidden');
+  startCamera();
+}
+
+function loadUploadedFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    // Resize using canvas
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.getElementById('webcam-canvas');
+      const MAX = 800;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = h * MAX / w; w = MAX; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      capturedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      canvas.classList.remove('hidden');
+      document.getElementById('webcam-video').classList.add('hidden');
+      document.getElementById('camera-placeholder').classList.add('hidden');
+      document.getElementById('photo-b64').value = capturedDataUrl;
+      document.getElementById('photo-status').classList.remove('hidden');
+      document.getElementById('no-photo-warning').classList.add('hidden');
+      document.getElementById('btn-retake').classList.remove('hidden');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function validatePhoto() {
+  if (!document.getElementById('photo-b64').value) {
+    document.getElementById('no-photo-warning').classList.remove('hidden');
+    document.getElementById('no-photo-warning').querySelector('p').textContent = '⚠️ Please capture or upload a photo first!';
+    return false;
+  }
+  return true;
+}
+
+// ── Photo Viewer ────────────────────────────────────────────
+function showPhoto(url) {
+  document.getElementById('photo-modal-img').src = url;
+  openModal('photo-modal');
+}
+</script>
+{% endblock %}

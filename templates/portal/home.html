@@ -1,0 +1,152 @@
+{% extends "portal/base.html" %}
+{% block title %}My Dashboard — Employee Portal{% endblock %}
+{% block page_title %}My Dashboard{% endblock %}
+{% block page_subtitle %}Welcome back, {{ current_user.full_name if current_user else 'Employee' }}{% endblock %}
+
+{% block content %}
+
+<!-- Welcome Banner -->
+<div class="rounded-2xl bg-gradient-to-r from-indigo-600/20 via-purple-600/10 to-pink-600/10 border border-indigo-500/20 p-6 mb-6 flex items-center gap-5">
+  <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-2xl font-black text-white shadow-xl shadow-indigo-500/20 flex-shrink-0">
+    {{ (current_user.full_name or 'E')[0] if current_user else 'E' }}
+  </div>
+  <div>
+    <h2 class="text-xl font-black text-white">Hello, {{ (current_user.full_name or 'Employee').split()[0] }}! 👋</h2>
+    {% if emp %}
+    <p class="text-sm text-slate-300 mt-0.5">{{ emp.employee_id or '' }} · {{ emp.dept_name or '' }} · {{ emp.pos_title or '' }}</p>
+    {% else %}
+    <p class="text-sm text-slate-400 mt-0.5">Your employee profile is not linked yet. Ask HR to link your account.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  {% for label, val, clr, icon, href in [
+    ("Attendance Records", att_count, "indigo", "📋", "/portal/attendance"),
+    ("Leave Requests", leave_count, "amber", "🏖", "/portal/leaves"),
+    ("Payslips", payslip_count, "emerald", "💳", "/portal/payslips"),
+    ("Peer Rating", vote_avg if vote_count > 0 else "—", "purple", "⭐", "/portal")
+  ] %}
+  <a href="{{ href }}" class="rounded-2xl bg-surface-800 border border-{{ clr }}-500/10 hover:border-{{ clr }}-500/50 hover:bg-{{ clr }}-500/5 hover:-translate-y-1 hover:shadow-lg hover:shadow-{{ clr }}-500/20 p-4 text-center transition-all duration-300 group relative overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-br from-{{ clr }}-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+    <div class="text-2xl mb-1 relative z-10">{{ icon }}</div>
+    <p class="text-2xl font-black text-white group-hover:text-{{ clr }}-400 transition-colors relative z-10">{{ val }}</p>
+    <p class="text-xs text-slate-400 mt-0.5 relative z-10">{{ label }}</p>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+  <!-- Leave Balances -->
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-5">
+    <h2 class="text-sm font-bold text-white mb-4">My Leave Balances</h2>
+    {% if leave_bals %}
+    <div class="space-y-3">
+      {% for bal in leave_bals %}
+      {% set entitled = bal.entitled_days | int %}
+      {% set used = bal.used_days | int %}
+      {% set remain = bal.remain_days | int %}
+      {% set pct = (used / entitled * 100) | int if entitled > 0 else 0 %}
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-slate-300">{{ bal.type_name }}</span>
+          <span class="text-xs font-bold text-white">{{ remain }} days left</span>
+        </div>
+        <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
+          <div class="h-full rounded-full {{ 'bg-rose-500' if pct > 80 else ('bg-amber-500' if pct > 50 else 'bg-emerald-500') }}"
+            style="width:{{ pct }}%"></div>
+        </div>
+        <p class="text-[10px] text-slate-500 mt-0.5">{{ used }} used of {{ entitled }} days</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-slate-500 text-sm text-center py-4">No leave balance data. Contact HR.</p>
+    {% endif %}
+    <a href="/portal/leaves" class="block mt-4 text-center text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Request leave →</a>
+  </div>
+
+  <!-- Announcements -->
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-5">
+    <h2 class="text-sm font-bold text-white mb-4">Company Announcements</h2>
+    {% if ann_list %}
+    <div class="space-y-3 max-h-64 overflow-y-auto">
+      {% for a in ann_list | sort(attribute='created_at', reverse=True) %}
+      {% set p = a.priority or 'Medium' %}
+      <div class="flex items-start gap-3 bg-white/3 rounded-xl p-3">
+        {% if a.is_pinned %}<span class="text-sm flex-shrink-0">📌</span>{% endif %}
+        <div>
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full
+              {% if p == 'Urgent' %}text-rose-400 bg-rose-400/10
+              {% elif p == 'High' %}text-orange-400 bg-orange-400/10
+              {% elif p == 'Medium' %}text-amber-400 bg-amber-400/10
+              {% else %}text-slate-400 bg-white/5{% endif %}">{{ p }}</span>
+            <span class="text-[10px] text-slate-500">{{ (a.created_at or '')[:10] }}</span>
+          </div>
+          <p class="text-xs font-semibold text-white">{{ a.title }}</p>
+          <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{{ a.content }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-8 text-slate-500 text-sm">No announcements at this time.</div>
+    {% endif %}
+  </div>
+
+  <!-- KPI Radar Chart -->
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-5 flex flex-col items-center justify-center relative overflow-hidden group">
+    <div class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-50"></div>
+    <h2 class="text-sm font-bold text-white mb-4 self-start relative z-10">My Performance Overview</h2>
+    <div class="w-full max-w-[280px] aspect-square relative z-10">
+      <canvas id="kpiRadarChart"></canvas>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Setup KPI Radar Chart
+  const ctx = document.getElementById('kpiRadarChart');
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: ['Attendance', 'Punctuality', 'SOPs', 'Peer Votes', 'Initiative'],
+        datasets: [{
+          label: 'My Scores',
+          data: [95, 88, 100, 92, 85], // Simulated recent performance
+          backgroundColor: 'rgba(99, 102, 241, 0.2)', // Indigo 500
+          borderColor: 'rgba(99, 102, 241, 0.8)',
+          pointBackgroundColor: 'rgba(217, 70, 239, 1)', // Fuchsia 500
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: 'rgba(217, 70, 239, 1)',
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          r: {
+            angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+            pointLabels: { color: 'rgba(148, 163, 184, 1)', font: { size: 10, family: "'Inter', sans-serif" } },
+            ticks: { display: false, min: 0, max: 100 }
+          }
+        },
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+  }
+</script>
+{% endblock %}

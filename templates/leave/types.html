@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Leave Types — CorpHRM{% endblock %}
+{% block page_title %}Leave Types{% endblock %}
+{% block page_subtitle %}Configure leave entitlements and policies{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <a href="/leave" class="text-sm text-slate-400 hover:text-white flex items-center gap-1.5">← Back to Leave Management</a>
+  <button onclick="openModal('add-lt-modal')" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
+    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+    Add Leave Type
+  </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for lt in leave_types %}
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-5 hover:border-indigo-500/20 transition-all">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-semibold {{ 'text-emerald-400 bg-emerald-400/10' if lt.is_paid else 'text-slate-400 bg-white/5' }} px-2.5 py-1 rounded-full">{{ 'Paid' if lt.is_paid else 'Unpaid' }}</span>
+      <span class="text-2xl font-black text-white">{{ lt.default_days }}</span>
+    </div>
+    <h3 class="font-bold text-white">{{ lt.type_name }}</h3>
+    <p class="text-xs text-slate-400 mt-1">{{ lt.description or 'No description' }}</p>
+    <p class="text-xs text-slate-500 mt-2">{{ lt.default_days }} days entitlement</p>
+    {% if current_user and current_user.role in ['boss', 'hr_manager', 'admin'] %}
+    <div class="mt-4 pt-4 border-t border-white/5 flex items-center justify-end gap-4">
+      <button onclick='openEditModal({{ lt.id|tojson }}, {{ lt.type_name|tojson }}, {{ lt.description|default("")|tojson }}, {{ lt.default_days }}, {{ "true" if lt.is_paid else "false" }})' class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        Edit
+      </button>
+      <button onclick='openDeleteModal({{ lt.id|tojson }}, {{ lt.type_name|tojson }})' class="text-xs text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        Delete
+      </button>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="col-span-3 rounded-2xl bg-surface-800 border border-white/5 p-12 text-center text-slate-500 text-sm">No leave types configured. <a href="/leave-types" class="text-indigo-400 hover:underline">Add one</a></div>
+  {% endfor %}
+</div>
+
+<div id="add-lt-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('add-lt-modal')"></div>
+  <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-md m-4">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <h2 class="text-base font-bold text-white">New Leave Type</h2>
+      <button onclick="closeModal('add-lt-modal')" class="text-slate-400 hover:text-white">✕</button>
+    </div>
+    <form method="post" action="/leave-types/add" class="p-6 space-y-4">
+      <div><label class="form-label">Type Name *</label><input type="text" name="type_name" required class="form-input" placeholder="e.g. Annual Leave"/></div>
+      <div><label class="form-label">Description</label><textarea name="description" rows="2" class="form-input" placeholder="Brief description..."></textarea></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="form-label">Default Days</label><input type="number" name="default_days" value="14" class="form-input"/></div>
+        <div><label class="form-label">Type</label><select name="is_paid" class="form-input"><option value="true">Paid</option><option value="false">Unpaid</option></select></div>
+      </div>
+      <div class="flex gap-3">
+        <button type="button" onclick="closeModal('add-lt-modal')" class="flex-1 text-sm text-slate-400 py-2.5 rounded-xl bg-white/5">Cancel</button>
+        <button type="submit" class="flex-1 text-sm font-semibold text-white py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="edit-lt-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('edit-lt-modal')"></div>
+  <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-md m-4">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <h2 class="text-base font-bold text-white">Edit Leave Type</h2>
+      <button onclick="closeModal('edit-lt-modal')" class="text-slate-400 hover:text-white">✕</button>
+    </div>
+    <form id="edit-lt-form" method="post" action="/leave-types/edit" class="p-6 space-y-4">
+      <div><label class="form-label">Type Name *</label><input type="text" id="edit-type-name" name="type_name" required class="form-input"/></div>
+      <div><label class="form-label">Description</label><textarea id="edit-description" name="description" rows="2" class="form-input"></textarea></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="form-label">Default Days</label><input type="number" id="edit-default-days" name="default_days" class="form-input"/></div>
+        <div><label class="form-label">Type</label><select id="edit-is-paid" name="is_paid" class="form-input"><option value="true">Paid</option><option value="false">Unpaid</option></select></div>
+      </div>
+      <div class="flex gap-3">
+        <button type="button" onclick="closeModal('edit-lt-modal')" class="flex-1 text-sm text-slate-400 py-2.5 rounded-xl bg-white/5">Cancel</button>
+        <button type="submit" class="flex-1 text-sm font-semibold text-white py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="delete-lt-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('delete-lt-modal')"></div>
+  <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-md m-4">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <h2 class="text-base font-bold text-white">Delete Leave Type</h2>
+      <button onclick="closeModal('delete-lt-modal')" class="text-slate-400 hover:text-white">✕</button>
+    </div>
+    <form id="delete-lt-form" method="post" action="" class="p-6">
+      <p class="text-sm text-slate-400 mb-6">Are you sure you want to delete <span id="delete-lt-name" class="font-bold text-white"></span>? This action cannot be undone.</p>
+      <div class="flex gap-3">
+        <button type="button" onclick="closeModal('delete-lt-modal')" class="flex-1 text-sm text-slate-400 py-2.5 rounded-xl bg-white/5">Cancel</button>
+        <button type="submit" class="flex-1 text-sm font-semibold text-white py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700">Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditModal(id, name, desc, days, is_paid) {
+    document.getElementById('edit-lt-form').action = '/leave-types/' + id + '/edit';
+    document.getElementById('edit-type-name').value = name || '';
+    document.getElementById('edit-description').value = desc && desc !== 'None' ? desc : '';
+    document.getElementById('edit-default-days').value = days;
+    document.getElementById('edit-is-paid').value = is_paid;
+    document.getElementById('edit-lt-modal').classList.remove('hidden');
+}
+function openDeleteModal(id, name) {
+    document.getElementById('delete-lt-form').action = '/leave-types/' + id + '/delete';
+    document.getElementById('delete-lt-name').innerText = name;
+    document.getElementById('delete-lt-modal').classList.remove('hidden');
+}
+</script>
+{% endblock %}

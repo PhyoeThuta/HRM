@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Onboarding — CorpHRM{% endblock %}
+{% block page_title %}Onboarding & Pre-boarding{% endblock %}
+{% block page_subtitle %}Automated new hire onboarding with task checklists{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="rounded-2xl bg-surface-800 border border-amber-500/20 p-5 text-center"><p class="text-3xl font-black text-white">{{ stats.pre_boarding }}</p><p class="text-xs text-slate-400 mt-1">Pre-boarding</p></div>
+  <div class="rounded-2xl bg-surface-800 border border-indigo-500/20 p-5 text-center"><p class="text-3xl font-black text-white">{{ stats.in_progress }}</p><p class="text-xs text-slate-400 mt-1">In Progress</p></div>
+  <div class="rounded-2xl bg-surface-800 border border-emerald-500/20 p-5 text-center"><p class="text-3xl font-black text-white">{{ stats.completed }}</p><p class="text-xs text-slate-400 mt-1">Completed</p></div>
+</div>
+
+<!-- New Hires Without Onboarding -->
+{% if new_hires %}
+<div class="rounded-2xl bg-gradient-to-r from-indigo-900/30 to-purple-900/20 border border-indigo-500/20 p-5 mb-6">
+  <h2 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+    <span class="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs font-black">!</span>
+    {{ new_hires|length }} New Hire(s) Without Onboarding
+  </h2>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    {% for emp in new_hires %}
+    <div class="bg-white/5 rounded-xl p-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white">{{ (emp.Full_name or '?')[0] }}</div>
+        <div>
+          <p class="text-sm font-medium text-white truncate max-w-[100px]">{{ emp.Full_name }}</p>
+          <p class="text-xs text-slate-500">{{ emp.hire_date or 'No date' }}</p>
+        </div>
+      </div>
+      <button onclick="document.getElementById('ob-{{ emp.id }}').classList.remove('hidden')" class="text-xs text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-1 rounded-lg">Start</button>
+    </div>
+    <!-- Inline start form (hidden) -->
+    <form id="ob-{{ emp.id }}" method="post" action="/onboarding/start/{{ emp.id }}" class="hidden bg-surface-850 border border-indigo-500/30 rounded-xl p-3 col-span-2 space-y-2">
+      <p class="text-xs font-bold text-white">Start Onboarding: {{ emp.Full_name }}</p>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-xs text-slate-400">Start Date</label><input type="date" name="start_date" value="{{ emp.hire_date or '' }}" class="form-input text-xs py-1.5"/></div>
+        <div><label class="text-xs text-slate-400">Buddy (optional)</label><select name="buddy_id" class="form-input text-xs py-1.5"><option value="">— None —</option>{% for t in new_hires %}{% if t.id != emp.id %}<option value="{{ t.id }}">{{ t.Full_name }}</option>{% endif %}{% endfor %}</select></div>
+      </div>
+      <div class="flex gap-2">
+        <button type="button" onclick="document.getElementById('ob-{{ emp.id }}').classList.add('hidden')" class="text-xs text-slate-400 px-3 py-1.5 rounded-lg bg-white/5">Cancel</button>
+        <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700">🚀 Start & Auto-Assign Tasks</button>
+      </div>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Active Onboarding -->
+<div class="space-y-4">
+  {% for ob in onboarding %}
+  {% set status_colors = {"Pre-boarding":"amber","In Progress":"indigo","Completed":"emerald","Cancelled":"slate"} %}
+  {% set clr = status_colors.get(ob.status, "slate") %}
+  <div class="rounded-2xl bg-surface-800 border border-{{ clr }}-500/20 overflow-hidden">
+    <div class="px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-{{ clr }}-500 to-{{ clr }}-700 flex items-center justify-center text-xl font-black text-white">
+          {{ (ob.Full_name or '?')[0] }}
+        </div>
+        <div>
+          <h3 class="font-bold text-white">{{ ob.Full_name or '—' }}</h3>
+          <div class="flex items-center gap-3 mt-0.5">
+            <span class="font-mono text-xs text-indigo-400">{{ ob.employee_code or '—' }}</span>
+            <span class="text-xs text-slate-400">{{ ob.dept_name }}</span>
+            <span class="text-xs text-slate-400">Start: {{ ob.start_date or '—' }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <!-- Progress Ring -->
+        <div class="text-center">
+          <p class="text-2xl font-black {{ 'text-emerald-400' if ob.completion_pct == 100 else 'text-indigo-400' }}">{{ ob.completion_pct }}%</p>
+          <p class="text-xs text-slate-400">{{ ob.tasks_done }}/{{ ob.tasks_total }} tasks</p>
+        </div>
+        <span class="text-xs font-semibold text-{{ clr }}-400 bg-{{ clr }}-400/10 border border-{{ clr }}-400/20 px-3 py-1.5 rounded-full">{{ ob.status }}</span>
+        <a href="/onboarding/{{ ob.id }}" class="text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-xl transition-colors">View Tasks →</a>
+      </div>
+    </div>
+    <!-- Progress Bar -->
+    <div class="px-6 pb-4">
+      <div class="h-2 bg-white/5 rounded-full overflow-hidden">
+        <div class="h-full rounded-full transition-all duration-700 {{ 'bg-emerald-500' if ob.completion_pct == 100 else 'bg-indigo-500' }}" style="width:{{ ob.completion_pct }}%"></div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="rounded-2xl bg-surface-800 border border-white/5 p-16 text-center">
+    <div class="text-5xl mb-3">🚀</div>
+    <p class="text-slate-400">No active onboarding processes. Add employees to get started.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{
+  "target_bonus_percentage": 90,
+  "auto_weights": {
+    "attendance": 20,
+    "punctuality": 10,
+    "sops": 30,
+    "peer_voting": 10
+  },
+  "manual_metrics": [
+    {
+      "id": "hygiene___grooming",
+      "name": "Hygiene & Grooming",
+      "weight": 10
+    },
+    {
+      "id": "safety_compliance",
+      "name": "Safety Compliance",
+      "weight": 10
+    },
+    {
+      "id": "customer_satisfaction",
+      "name": "Customer Satisfaction",
+      "weight": 10
+    }
+  ]
+}

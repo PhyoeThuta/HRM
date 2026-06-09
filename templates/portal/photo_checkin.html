@@ -1,0 +1,146 @@
+{% extends "portal/base.html" %}
+{% block title %}Photo Check-In — Employee Portal{% endblock %}
+{% block page_title %}Photo Check-In 📸{% endblock %}
+{% block page_subtitle %}Take a selfie to record your attendance{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+  <div class="rounded-3xl bg-surface-800 border border-white/5 overflow-hidden">
+
+    <!-- Camera view -->
+    <div class="relative bg-black aspect-video w-full overflow-hidden" id="camera-area">
+      <video id="video" autoplay playsinline class="w-full h-full object-cover"></video>
+      <canvas id="canvas" class="hidden w-full h-full object-cover"></canvas>
+      <!-- Overlay guide -->
+      <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div class="w-40 h-40 rounded-full border-2 border-dashed border-white/30"></div>
+      </div>
+      <!-- Camera off state -->
+      <div id="camera-off" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-900 text-slate-400">
+        <div class="text-5xl mb-3">📷</div>
+        <p class="text-sm font-semibold">Camera not started</p>
+        <p class="text-xs text-slate-500 mt-1">Click "Start Camera" below</p>
+      </div>
+      <!-- Photo taken preview label -->
+      <div id="captured-label" class="hidden absolute top-3 left-3 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+        ✓ Photo taken
+      </div>
+    </div>
+
+    <div class="p-6">
+      <!-- Time display -->
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <p class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Check-In Time</p>
+          <p id="clock" class="text-2xl font-black text-white font-mono mt-0.5">--:--:--</p>
+          <p id="dateline" class="text-xs text-slate-400 mt-0.5"></p>
+        </div>
+        <div id="status-badge" class="text-xs font-bold px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          Waiting...
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="space-y-3">
+        <div class="flex gap-3">
+          <button id="btn-start" onclick="startCamera()"
+            class="flex-1 text-sm font-bold text-white py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition-colors">
+            📷 Start Camera
+          </button>
+          <button id="btn-capture" onclick="capturePhoto()" disabled
+            class="flex-1 text-sm font-bold text-white py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            📸 Take Photo
+          </button>
+        </div>
+        <button id="btn-retake" onclick="retakePhoto()" class="hidden w-full text-sm text-slate-400 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+          🔄 Retake
+        </button>
+
+        <!-- Submit form (hidden until photo taken) -->
+        <form id="checkin-form" method="post" action="/portal/attendance/photo-checkin" class="hidden">
+          <input type="hidden" name="photo_data" id="photo-data-input"/>
+          <button type="submit" id="btn-submit"
+            class="w-full text-sm font-black text-white py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg shadow-emerald-500/20">
+            ✅ Confirm Check-In
+          </button>
+        </form>
+      </div>
+
+      <!-- Info note -->
+      <div class="mt-4 flex items-start gap-2.5 bg-indigo-500/5 border border-indigo-500/15 rounded-xl px-4 py-3">
+        <span class="text-indigo-400 mt-0.5 flex-shrink-0">ℹ️</span>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Your photo check-in is recorded with timestamp. The system detects late arrival after <strong class="text-white">9:00 AM</strong>.
+          Make sure your face is clearly visible inside the circle.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let stream = null;
+const video  = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const cameraOff = document.getElementById('camera-off');
+
+// Live clock
+function tick() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString();
+  document.getElementById('dateline').textContent = now.toLocaleDateString('en-GB', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const h = now.getHours();
+  const badge = document.getElementById('status-badge');
+  if (h < 9) { badge.textContent = 'On Time ✓'; badge.className = 'text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'; }
+  else        { badge.textContent = 'Late ⚠'; badge.className = 'text-xs font-bold px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20'; }
+}
+tick(); setInterval(tick, 1000);
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});
+    video.srcObject = stream;
+    video.classList.remove('hidden');
+    canvas.classList.add('hidden');
+    cameraOff.classList.add('hidden');
+    document.getElementById('btn-start').disabled = true;
+    document.getElementById('btn-capture').disabled = false;
+    document.getElementById('captured-label').classList.add('hidden');
+    document.getElementById('checkin-form').classList.add('hidden');
+    document.getElementById('btn-retake').classList.add('hidden');
+  } catch(e) {
+    alert('Could not access camera: ' + e.message);
+  }
+}
+
+function capturePhoto() {
+  const ctx = canvas.getContext('2d');
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+  document.getElementById('photo-data-input').value = dataUrl;
+  // Show captured image
+  video.classList.add('hidden');
+  canvas.classList.remove('hidden');
+  document.getElementById('captured-label').classList.remove('hidden');
+  document.getElementById('btn-capture').disabled = true;
+  document.getElementById('btn-retake').classList.remove('hidden');
+  document.getElementById('checkin-form').classList.remove('hidden');
+  // Stop stream
+  if (stream) stream.getTracks().forEach(t => t.stop());
+}
+
+function retakePhoto() {
+  canvas.classList.add('hidden');
+  document.getElementById('captured-label').classList.add('hidden');
+  document.getElementById('checkin-form').classList.add('hidden');
+  document.getElementById('btn-retake').classList.add('hidden');
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-capture').disabled = true;
+  cameraOff.classList.remove('hidden');
+}
+</script>
+{% endblock %}

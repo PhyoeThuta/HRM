@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Birthdays — CorpHRM{% endblock %}
+{% block page_title %}Birthday Notifications{% endblock %}
+{% block page_subtitle %}{{ today }} · Automated birthday detection engine{% endblock %}
+
+{% block content %}
+<!-- Today's Birthdays -->
+{% if log_entries %}
+<div class="rounded-2xl bg-gradient-to-r from-pink-900/30 to-purple-900/20 border border-pink-500/30 p-6 mb-6">
+  <div class="flex items-center gap-3 mb-4">
+    <div class="w-10 h-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-xl">🎂</div>
+    <div>
+      <h2 class="text-sm font-bold text-white">{{ birthday_count }} Birthday{{ 's' if birthday_count != 1 else '' }} Today!</h2>
+      <p class="text-xs text-slate-400">Notifications auto-generated and sent to all staff</p>
+    </div>
+  </div>
+  {% for entry in log_entries %}
+  <div class="bg-white/5 rounded-xl p-4 mb-3">
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-xl font-black text-white">{{ entry.name[0] }}</div>
+      <div>
+        <h3 class="font-bold text-white">🎉 {{ entry.name }}</h3>
+        <p class="text-xs text-slate-400">{{ entry.id }} · {{ entry.dept }}</p>
+      </div>
+    </div>
+    <div class="bg-black/20 rounded-lg p-3 font-mono text-xs text-emerald-300 leading-relaxed">
+      <p class="text-slate-500 mb-1">// Supabase auto-insert log</p>
+      <p>INSERT INTO birthday_notification</p>
+      <p class="ml-2">WHERE employee_id = '{{ entry.id }}'</p>
+      <p class="ml-2">SET message = "{{ entry.message }}"</p>
+      <p class="mt-1">→ Inserted birthday_notification_requests</p>
+      <p class="ml-2">FOR {{ entry.recipient_count }} recipients (excluding birthday person)</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="rounded-2xl bg-surface-800 border border-white/5 p-8 mb-6 text-center">
+  <div class="text-4xl mb-2">🎂</div>
+  <p class="text-slate-400 text-sm">No birthdays today ({{ today }}). Check the upcoming list below!</p>
+</div>
+{% endif %}
+
+<!-- Upcoming 30 Days -->
+<div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+  <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+    <h2 class="text-sm font-bold text-white">Upcoming Birthdays (Next 30 Days)</h2>
+    <span class="text-xs text-slate-400">{{ upcoming|length }} upcoming</span>
+  </div>
+  {% if upcoming %}
+  <div class="divide-y divide-white/5">
+    {% for emp in upcoming %}
+    <div class="px-6 py-4 flex items-center justify-between hover:bg-white/2 transition-colors">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white">{{ (emp.Full_name or '?')[0] }}</div>
+        <div>
+          <p class="font-medium text-white">{{ emp.Full_name }}</p>
+          <p class="text-xs text-slate-400">{{ emp.dept_name }} · DOB: {{ emp.date_of_birth }}</p>
+        </div>
+      </div>
+      <div class="text-right">
+        <p class="text-sm font-bold {{ 'text-pink-400' if emp.days_until <= 7 else 'text-slate-300' }}">{{ emp.birthday_date }}</p>
+        <p class="text-xs {{ 'text-pink-400' if emp.days_until <= 7 else 'text-slate-400' }}">
+          {% if emp.days_until == 1 %}Tomorrow! 🎉
+          {% elif emp.days_until <= 7 %}In {{ emp.days_until }} days 🎂
+          {% else %}In {{ emp.days_until }} days{% endif %}
+        </p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="p-12 text-center text-slate-500 text-sm">No upcoming birthdays in the next 30 days.</div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+<head>
+  <!-- Theme flicker prevention: apply saved theme BEFORE render -->
+  <script>document.getElementById('html-root').setAttribute('data-theme', localStorage.getItem('hrm-theme') || 'dark');</script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}CorpHRM Enterprise{% endblock %}</title>
+  <meta name="description" content="Corporate HR Automation System — Full Enterprise Edition"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: {
+          brand: { 50:'#f0f4ff',100:'#e0e9ff',200:'#c7d7fe',300:'#a5b9fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81',950:'#1e1b4b' },
+          surface: { 800:'#1e2235',850:'#161929',900:'#0f1120',950:'#080b14' }
+        },
+        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui'] },
+      }}
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/custom.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-surface-950 text-slate-100 font-sans flex min-h-screen" x-data="{ sidebarOpen: true }">
+
+<!-- ── SIDEBAR ── -->
+<aside class="fixed inset-y-0 left-0 z-40 w-64 bg-surface-900 border-r border-white/5 flex flex-col">
+  <!-- Logo -->
+  <div class="px-5 py-4 border-b border-white/5 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center shadow-lg flex-shrink-0">
+      <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg>
+    </div>
+    <div>
+      <p class="text-sm font-bold text-white leading-tight">CorpHRM</p>
+      <p class="text-[10px] text-slate-400 font-medium tracking-widest">ENTERPRISE</p>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <nav class="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
+
+    {% macro nav_item(key, href, label, icon_d) %}
+    <a href="{{ href }}" id="nav-{{ key }}"
+       class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
+              {{ 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' if page == key else 'text-slate-400 hover:bg-white/5 hover:text-white' }}">
+      <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 {{ 'bg-indigo-500/20' if page == key else 'group-hover:bg-white/5' }}">
+        <svg class="w-4 h-4 {{ 'text-indigo-400' if page == key else 'text-slate-500 group-hover:text-slate-300' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round" d="{{ icon_d }}"/>
+        </svg>
+      </div>
+      <span>{{ label }}</span>
+      {% if page == key %}<span class="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400"></span>{% endif %}
+    </a>
+    {% endmacro %}
+
+    <!-- Section: Core -->
+    <p class="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Core</p>
+    {{ nav_item("dashboard",  "/dashboard",  "Dashboard",   "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6") }}
+    {{ nav_item("employees",  "/employees",  "Employees",   "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0") }}
+    {{ nav_item("departments","/departments","Departments",  "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4") }}
+    {{ nav_item("positions",  "/positions",  "Positions",    "M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z") }}
+
+    <!-- Section: HR Operations -->
+    <p class="px-3 pt-4 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Operations</p>
+    {{ nav_item("attendance",  "/attendance", "Attendance",   "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4") }}
+    {{ nav_item("leave",       "/leave",      "Leave Mgmt",   "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z") }}
+    {{ nav_item("payroll",     "/payroll",    "Payroll & KPI","M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z") }}
+    {{ nav_item("recruitment", "/recruitment","Recruitment",  "M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z") }}
+    {{ nav_item("documents", "/documents", "Document Vault", "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z") }}
+    {{ nav_item("sops", "/sops", "Daily SOPs", "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z") }}
+
+    <!-- Section: People -->
+    <p class="px-3 pt-4 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-widest">People</p>
+    {{ nav_item("peer_voting", "/peer-voting","Peer Voting",  "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z") }}
+    {{ nav_item("birthdays",   "/birthdays",  "Birthdays",   "M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-1.5-.454M9 6l3-3 3 3m-3-3v12") }}
+
+    <!-- Section: Lifecycle -->
+    <p class="px-3 pt-4 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Lifecycle</p>
+    {{ nav_item("onboarding",  "/onboarding", "Onboarding",  "M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z") }}
+    {{ nav_item("offboarding", "/offboarding","Offboarding", "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1") }}
+
+    {% if current_user and current_user.role in ['boss', 'hr_manager', 'admin'] %}
+    <!-- Section: Boss Panel -->
+    <p class="px-3 pt-4 pb-1 text-[10px] font-bold text-amber-500/60 uppercase tracking-widest">Administration</p>
+    {% if current_user and current_user.role == 'boss' %}
+    {{ nav_item("boss", "/boss", "Executive Overview", "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z") }}
+    <a href="/boss/kpi" id="nav-boss-kpi"
+       class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-slate-400 hover:bg-white/5 hover:text-white">
+      <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-white/5">
+        <svg class="w-4 h-4 text-slate-500 group-hover:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+        </svg>
+      </div>
+      <span>KPI Assignments</span>
+    </a>
+    {% endif %}
+    <a href="/boss/announcements" id="nav-boss-ann"
+       class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-slate-400 hover:bg-white/5 hover:text-white">
+      <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-white/5">
+        <svg class="w-4 h-4 text-slate-500 group-hover:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+        </svg>
+      </div>
+      <span>Announcements</span>
+    </a>
+    <a href="/boss/users" id="nav-boss-users"
+       class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-slate-400 hover:bg-white/5 hover:text-white">
+      <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-white/5">
+        <svg class="w-4 h-4 text-slate-500 group-hover:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+        </svg>
+      </div>
+      <span>User Accounts</span>
+    </a>
+    {% endif %}
+  </nav>
+
+  <!-- User footer -->
+  <div class="px-4 py-3 border-t border-white/5">
+    <div class="flex items-center gap-2.5 px-1">
+      {% if current_user %}
+      <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0
+        {% if current_user.role == 'boss' %}bg-gradient-to-br from-amber-500 to-orange-500
+        {% elif current_user.role == 'hr_manager' %}bg-gradient-to-br from-indigo-500 to-purple-500
+        {% elif current_user.role == 'general_manager' %}bg-gradient-to-br from-cyan-500 to-blue-500
+        {% else %}bg-gradient-to-br from-slate-500 to-slate-600{% endif %}">
+        {{ (current_user.full_name or 'U')[0] }}
+      </div>
+      <div class="min-w-0">
+        <p class="text-xs font-semibold text-white truncate">{{ current_user.full_name }}</p>
+        <p class="text-[10px] text-slate-400 truncate capitalize">{{ current_user.role | replace('_',' ') }}</p>
+      </div>
+      <a href="/logout" class="ml-auto text-slate-500 hover:text-rose-400 transition-colors flex-shrink-0" title="Logout">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+      </a>
+      {% else %}
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">HR</div>
+      <div class="min-w-0"><p class="text-xs font-semibold text-white truncate">HR Administrator</p><p class="text-[10px] text-slate-400 truncate">Full System Access</p></div>
+      {% endif %}
+    </div>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<main class="ml-64 flex-1 flex flex-col min-h-screen">
+  <!-- Top Bar -->
+  <header class="sticky top-0 z-30 bg-surface-900/80 backdrop-blur-md border-b border-white/5 px-8 py-3.5 flex items-center justify-between">
+    <div>
+      <h1 class="text-base font-bold text-white">{% block page_title %}Dashboard{% endblock %}</h1>
+      <p class="text-xs text-slate-400">{% block page_subtitle %}Corporate HR Automation System{% endblock %}</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-[11px] font-semibold text-emerald-400">LIVE · Supabase</span>
+      </div>
+      
+      <!-- Notification Dropdown -->
+      <div x-data="{ open: false }" class="relative">
+        <button @click="open = !open" @click.away="open = false" class="relative p-1.5 text-slate-400 hover:text-white transition-colors hover:bg-white/5 rounded-lg" title="Notifications">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+          </svg>
+          {% if unread_count and unread_count > 0 %}
+          <span id="notif-counter-1" class="absolute top-1 right-1 flex h-3 w-3 items-center justify-center rounded-full bg-rose-500 border border-surface-900 text-[8px] font-bold text-white">{{ unread_count }}</span>
+          {% endif %}
+        </button>
+        
+        <div x-show="open" x-transition.opacity.duration.200ms style="display: none;"
+             class="absolute right-0 mt-2 w-80 bg-surface-850 border border-white/10 rounded-2xl shadow-xl z-50 overflow-hidden">
+          <div class="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white">Notifications</h3>
+            {% if unread_count and unread_count > 0 %}
+            <span id="notif-counter-2" class="text-[10px] font-bold tracking-widest uppercase bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full">{{ unread_count }} New</span>
+            {% endif %}
+          </div>
+          <div class="max-h-96 overflow-y-auto">
+            {% if notifications %}
+              {% for n in notifications %}
+                <div id="notif-{{ n.id }}" class="px-4 py-3 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors {% if not n.is_read %}bg-indigo-500/5{% endif %} relative group"
+                     onclick="markReadAndGo('{{ n.id }}', '{{ n.link_url }}')">
+                  <button onclick="dismissNotif(event, '{{ n.id }}')" class="absolute top-3 right-4 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" title="Mark as read / Delete">✕</button>
+                  <p class="text-sm font-semibold pr-4 {{ 'text-white' if not n.is_read else 'text-slate-300' }}">{{ n.title }}</p>
+                  <p class="text-xs text-slate-400 mt-1 line-clamp-2 pr-4">{{ n.message }}</p>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="px-4 py-8 text-center">
+                <p class="text-sm text-slate-500">No notifications yet.</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Theme Toggle -->
+      <button id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">
+        <span id="theme-icon">🌙</span>
+        <span id="theme-label">Dark</span>
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      </button>
+      {% if current_user %}
+      <span class="text-xs font-bold px-2.5 py-1 rounded-full
+        {% if current_user.role == 'boss' %}text-amber-400 bg-amber-500/10 border border-amber-500/20
+        {% elif current_user.role == 'hr_manager' %}text-indigo-400 bg-indigo-500/10 border border-indigo-500/20
+        {% elif current_user.role == 'general_manager' %}text-cyan-400 bg-cyan-500/10 border border-cyan-500/20
+        {% else %}text-slate-400 bg-white/5{% endif %}">
+        {% if current_user.role == 'boss' %}👑{% elif current_user.role == 'hr_manager' %}🧑‍💼{% elif current_user.role == 'general_manager' %}🏢{% else %}👤{% endif %}
+        {{ current_user.role | replace('_',' ') | title }}
+      </span>
+      <a href="/logout" class="text-xs text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 px-3 py-1.5 rounded-xl transition-colors font-semibold">Logout</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <!-- Flash Messages -->
+  {% if success %}
+  <div class="mx-8 mt-4 flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-5 py-3" id="flash-msg">
+    <svg class="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <span class="text-sm text-emerald-300 font-medium">{{ success | replace('+', ' ') }}</span>
+    <button onclick="document.getElementById('flash-msg').remove()" class="ml-auto text-emerald-400 hover:text-emerald-300">✕</button>
+  </div>
+  {% endif %}
+  {% if error %}
+  <div class="mx-8 mt-4 flex items-center gap-3 bg-rose-500/10 border border-rose-500/30 rounded-2xl px-5 py-3" id="flash-err">
+    <svg class="w-5 h-5 text-rose-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    <span class="text-sm text-rose-300 font-medium">{{ error | replace('+', ' ') }}</span>
+    <button onclick="document.getElementById('flash-err').remove()" class="ml-auto text-rose-400 hover:text-rose-300">✕</button>
+  </div>
+  {% endif %}
+
+  <!-- Content -->
+  <div class="flex-1 p-8">
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+<!-- Modal backdrop helper -->
+<script>
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); document.body.classList.add('overflow-hidden'); }
+function closeModal(id){ document.getElementById(id).classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }
+// Auto-hide flash after 4s
+setTimeout(()=>{ const f=document.getElementById('flash-msg'); if(f) f.remove(); }, 4000);
+setTimeout(()=>{ const f=document.getElementById('flash-err'); if(f) f.remove(); }, 5000);
+</script>
+<script src="/static/js/main.js"></script>
+{% block scripts %}{% endblock %}
+<script>
+// ── Theme management ──────────────────────────────
+function applyTheme(theme) {
+  const root = document.getElementById('html-root');
+  root.setAttribute('data-theme', theme);
+  localStorage.setItem('hrm-theme', theme);
+  const icon  = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (icon)  icon.textContent  = theme === 'light' ? '☀️' : '🌙';
+  if (label) label.textContent = theme === 'light' ? 'Light' : 'Dark';
+}
+function toggleTheme() {
+  const current = document.getElementById('html-root').getAttribute('data-theme') || 'dark';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+// Init icon/label on load
+(function() {
+  const saved = localStorage.getItem('hrm-theme') || 'dark';
+  const icon  = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (icon)  icon.textContent  = saved === 'light' ? '☀️' : '🌙';
+  if (label) label.textContent = saved === 'light' ? 'Light' : 'Dark';
+})();
+
+async function markReadAndGo(notifId, url) {
+    try {
+        await fetch('/notifications/' + notifId + '/read', { method: 'POST' });
+    } catch(e) {}
+    if(url) window.location.href = url;
+}
+</script>
+</body>
+</html>

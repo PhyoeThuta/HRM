@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Payroll & KPI Automation — CorpHRM{% endblock %}
+{% block page_title %}Payroll & KPI{% endblock %}
+{% block page_subtitle %}Automated Monthly Calculation{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h2 class="text-xl font-bold text-white">Monthly Run: {{ current_month }}</h2>
+    <p class="text-sm text-slate-400">Review calculated KPIs and payslips before final approval.</p>
+  </div>
+</div>
+
+<div class="bg-surface-900 border border-white/5 rounded-3xl shadow-xl overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-left border-collapse">
+      <thead>
+        <tr class="bg-white/5 text-slate-400 text-[10px] uppercase tracking-widest">
+          <th class="px-4 py-4 font-bold border-b border-white/5">Employee</th>
+          <th class="px-4 py-4 font-bold border-b border-white/5 text-center">Base Salary</th>
+          <th class="px-4 py-4 font-bold border-b border-white/5 text-center">Attendance (40%)</th>
+          <th class="px-4 py-4 font-bold border-b border-white/5 text-center">SOPs (60%)</th>
+          <th class="px-4 py-4 font-bold border-b border-white/5 text-center">Final KPI</th>
+          <th class="px-4 py-4 font-bold border-b border-white/5 text-right">Deductions</th>
+          <th class="px-4 py-4 font-bold border-b border-white/5 text-right">Bonuses</th>
+          <th class="px-4 py-4 font-bold border-b border-white/5 text-right">Net Pay</th>
+          <th class="px-4 py-4 font-bold border-b border-white/5 text-center">Status</th>
+          <th class="px-4 py-4 font-bold border-b border-white/5"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5 text-sm">
+        {% for p in payslips %}
+        <tr class="hover:bg-white/[0.02] transition-colors group">
+          <td class="px-4 py-4 whitespace-nowrap">
+            <p class="font-bold text-white">{{ p.employee_name }}</p>
+            <p class="text-xs text-slate-500">{{ p.employee_code }}</p>
+          </td>
+          <td class="px-4 py-4 text-center text-slate-300 font-mono">${{ "%.2f"|format(p.base_salary) }}</td>
+          <td class="px-4 py-4 text-center">
+            <span class="inline-block px-2 py-1 bg-surface-950 rounded-lg text-xs font-bold {% if p.attendance_score >= 90 %}text-emerald-400{% elif p.attendance_score >= 70 %}text-amber-400{% else %}text-rose-400{% endif %}">
+              {{ "%.1f"|format(p.attendance_score) }}%
+            </span>
+          </td>
+          <td class="px-4 py-4 text-center">
+            <span class="inline-block px-2 py-1 bg-surface-950 rounded-lg text-xs font-bold {% if p.sop_score >= 90 %}text-emerald-400{% elif p.sop_score >= 70 %}text-amber-400{% else %}text-rose-400{% endif %}">
+              {{ "%.1f"|format(p.sop_score) }}%
+            </span>
+          </td>
+          <td class="px-4 py-4 text-center">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border {% if p.final_kpi_score >= 90 %}bg-emerald-500/10 text-emerald-400 border-emerald-500/20{% elif p.final_kpi_score >= 70 %}bg-amber-500/10 text-amber-400 border-amber-500/20{% else %}bg-rose-500/10 text-rose-400 border-rose-500/20{% endif %}">
+              {{ "%.1f"|format(p.final_kpi_score) }}%
+            </span>
+          </td>
+          <td class="px-4 py-4 text-right text-rose-400 font-mono">-${{ "%.2f"|format(p.deductions) }}</td>
+          <td class="px-4 py-4 text-right text-emerald-400 font-mono">+${{ "%.2f"|format(p.bonuses) }}</td>
+          <td class="px-4 py-4 text-right font-bold text-white font-mono text-base">${{ "%.2f"|format(p.net_pay) }}</td>
+          <td class="px-4 py-4 text-center">
+            {% if p.status == 'Pending' %}
+              <span class="text-xs font-bold text-amber-400 bg-amber-400/10 px-2 py-1 rounded-full border border-amber-400/20">Pending</span>
+            {% else %}
+              <span class="text-xs font-bold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full border border-emerald-400/20">Approved</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-4 text-right flex items-center justify-end gap-2">
+            {% if p.status == 'Pending' %}
+            <form action="/payroll/{{ p.id }}/approve" method="POST" class="inline">
+              <button type="submit" class="bg-indigo-500 hover:bg-indigo-400 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg shadow-indigo-500/20 transition-all">
+                Approve
+              </button>
+            </form>
+            {% endif %}
+            <form action="/payroll/{{ p.id }}/delete" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to delete this payroll record?');">
+              <button type="submit" class="bg-rose-500 hover:bg-rose-400 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg shadow-rose-500/20 transition-all">
+                Delete
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" class="px-6 py-12 text-center text-slate-500">No payroll calculations found for this month.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

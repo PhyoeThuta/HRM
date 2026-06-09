@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% block title %}{{ emp.Full_name }} — Employee Record{% endblock %}
+{% block page_title %}{{ emp.Full_name }}{% endblock %}
+{% block page_subtitle %}{{ emp.employee_id }} · {{ emp.dept_name }} · {{ emp.pos_title }} · Full Employee Record{% endblock %}
+
+{% block content %}
+<!-- Back + Actions -->
+<div class="flex items-center justify-between mb-6">
+  <a href="/employees" class="text-sm text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors">
+    ← Back to Employees
+  </a>
+  <div class="flex items-center gap-2">
+    <a href="/employees/{{ emp.id }}/edit"
+      class="text-sm font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 px-4 py-2 rounded-xl transition-all">
+      ✏️ Edit Profile
+    </a>
+    <form method="post" action="/employees/{{ emp.id }}/delete" onsubmit="return confirm('Permanently delete {{ emp.Full_name }}?')">
+      <button type="submit" class="text-sm font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 px-4 py-2 rounded-xl transition-all">
+        🗑 Delete
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+  <!-- ── LEFT: Profile Card ─────────────────────────────────── -->
+  <div class="lg:col-span-1 space-y-4">
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-6 text-center">
+      <!-- Avatar -->
+      <div class="w-24 h-24 rounded-3xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-4xl font-black text-white shadow-2xl shadow-indigo-500/20 mx-auto mb-4">
+        {{ (emp.Full_name or '?')[0] }}
+      </div>
+      <h2 class="text-xl font-bold text-white mb-1">{{ emp.Full_name }}</h2>
+      <p class="text-sm text-indigo-400 font-mono mb-1">{{ emp.employee_id }}</p>
+      <p class="text-xs text-slate-400 mb-3">{{ emp.pos_title or '—' }}</p>
+      <!-- Status badge -->
+      {% set st = emp.status or 'Active' %}
+      <span class="inline-block text-xs font-bold px-3 py-1 rounded-full
+        {% if st == 'Active' %}text-emerald-400 bg-emerald-400/10 border border-emerald-400/20
+        {% elif st == 'On Leave' %}text-amber-400 bg-amber-400/10 border border-amber-400/20
+        {% elif st == 'Terminated' %}text-rose-400 bg-rose-400/10 border border-rose-400/20
+        {% else %}text-slate-400 bg-white/5{% endif %}">
+        {{ st }}
+      </span>
+    </div>
+
+    <!-- Contact & Info -->
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-5 space-y-3">
+      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Contact & Info</p>
+      {% for icon, label, val in [
+        ('📧', 'Email', emp.email),
+        ('📱', 'Phone', emp.phone),
+        ('🏢', 'Department', emp.dept_name),
+        ('👔', 'Position', emp.pos_title),
+        ('📅', 'Hire Date', (emp.hire_date or '')[:10]),
+        ('🎂', 'Date of Birth', (emp.date_of_birth or '')[:10]),
+        ('👤', 'Manager', emp.manager_name),
+        ('💰', 'Salary', ('MMK {:,.0f}'.format(emp.salary) if emp.salary else None))
+      ] %}
+      {% if val %}
+      <div class="flex items-start gap-3">
+        <span class="text-base w-5 flex-shrink-0 mt-0.5">{{ icon }}</span>
+        <div class="min-w-0">
+          <p class="text-xs text-slate-500">{{ label }}</p>
+          <p class="text-sm text-white truncate">{{ val }}</p>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    <!-- Leave Balances -->
+    {% if leave_balances %}
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-5 space-y-3">
+      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Leave Balances {{ leave_year }}</p>
+      {% for bal in leave_balances %}
+      {% set entitled = bal.entitled_days | int %}
+      {% set used = bal.used_days | int %}
+      {% set remain = bal.remain_days | int %}
+      {% set pct = (used / entitled * 100) | int if entitled > 0 else 0 %}
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-slate-300">{{ bal.type_name or 'Leave' }}</span>
+          <span class="text-xs font-bold text-white">{{ remain }}/{{ entitled }}d left</span>
+        </div>
+        <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
+          <div class="h-full rounded-full transition-all
+            {% if pct > 80 %}bg-rose-500{% elif pct > 50 %}bg-amber-500{% else %}bg-emerald-500{% endif %}"
+            style="width: {{ pct }}%"></div>
+        </div>
+        <p class="text-xs text-slate-500 mt-0.5">{{ used }} used · {{ remain }} remaining</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Peer Vote Score -->
+    {% if vote_stats.votes > 0 %}
+    <div class="rounded-2xl bg-surface-800 border border-indigo-500/10 p-5">
+      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Peer Recognition</p>
+      <div class="flex items-center gap-3 mb-3">
+        <div class="text-3xl font-black text-white">{{ vote_stats.avg }}</div>
+        <div>
+          <div class="flex items-center gap-0.5 mb-0.5">
+            {% for i in range(5) %}
+            <span class="text-lg {{ 'text-amber-400' if i < vote_stats.avg|int else 'text-slate-700' }}">★</span>
+            {% endfor %}
+          </div>
+          <p class="text-xs text-slate-400">{{ vote_stats.votes }} vote{{ 's' if vote_stats.votes != 1 }}</p>
+        </div>
+      </div>
+      <a href="/peer-voting/{{ emp.id }}" class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">View voting profile →</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── RIGHT: All Records ─────────────────────────────────── -->
+  <div class="lg:col-span-3 space-y-5">
+
+    <!-- Stat Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {% for label, val, clr, icon in [
+        ('Attendance Days', attendance_count, 'indigo', '📋'),
+        ('Leaves Taken', leave_count, 'amber', '🏖'),
+        ('Payroll Records', payroll_count, 'emerald', '💳'),
+        ('KPI Records', kpi_count, 'purple', '📊')
+      ] %}
+      <div class="rounded-2xl bg-surface-800 border border-{{ clr }}-500/10 p-4 text-center">
+        <div class="text-2xl mb-1">{{ icon }}</div>
+        <p class="text-2xl font-black text-white">{{ val }}</p>
+        <p class="text-xs text-slate-400 mt-0.5">{{ label }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Attendance Records -->
+    <div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+      <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">📋 Attendance History</h3>
+        <span class="text-xs text-slate-400">{{ attendance_records|length }} records</span>
+      </div>
+      {% if attendance_records %}
+      <div class="overflow-x-auto max-h-64 overflow-y-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-surface-850 sticky top-0 z-10">
+            <tr>{% for h in ['Date','Check In','Check Out','Method','Hours','Late'] %}<th class="text-left py-2.5 px-4 text-slate-400 font-semibold uppercase tracking-wider">{{ h }}</th>{% endfor %}</tr>
+          </thead>
+          <tbody class="divide-y divide-white/3">
+            {% for r in attendance_records %}
+            <tr class="hover:bg-white/2">
+              <td class="py-2.5 px-4 text-slate-300">{{ (r.check_in or '')[:10] }}</td>
+              <td class="py-2.5 px-4 font-mono text-emerald-400">{{ (r.check_in or '')[11:16] or '—' }}</td>
+              <td class="py-2.5 px-4 font-mono text-rose-400">{{ (r.check_out or '')[11:16] or '—' }}</td>
+              <td class="py-2.5 px-4">
+                {% set m = r.attendance_method or 'Manual' %}
+                {% if m == 'QR' %}<span class="text-cyan-400">📱 QR</span>
+                {% elif m == 'Biometric' %}<span class="text-purple-400">👆 Bio</span>
+                {% elif m == 'Photo' %}<span class="text-pink-400">📸 Photo</span>
+                {% else %}<span class="text-slate-400">✏️ Manual</span>{% endif %}
+              </td>
+              <td class="py-2.5 px-4 font-mono text-white">{{ r.work_hours_calc or '—' }}{% if r.work_hours_calc %}h{% endif %}</td>
+              <td class="py-2.5 px-4">
+                {% if r.is_late %}<span class="text-amber-400">Late</span>{% else %}<span class="text-emerald-400">On time</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-8 text-center text-slate-500 text-sm">No attendance records.</div>
+      {% endif %}
+    </div>
+
+    <!-- Leave Requests -->
+    <div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+      <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white">🏖 Leave Requests</h3>
+        <span class="text-xs text-slate-400">{{ leave_requests|length }} requests</span>
+      </div>
+      {% if leave_requests %}
+      <div class="overflow-x-auto max-h-56 overflow-y-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-surface-850 sticky top-0 z-10">
+            <tr>{% for h in ['Type','From','To','Days','Status','Reason'] %}<th class="text-left py-2.5 px-4 text-slate-400 font-semibold uppercase tracking-wider">{{ h }}</th>{% endfor %}</tr>
+          </thead>
+          <tbody class="divide-y divide-white/3">
+            {% for lr in leave_requests %}
+            <tr class="hover:bg-white/2">
+              <td class="py-2.5 px-4 text-slate-300">{{ lr.type_name or '—' }}</td>
+              <td class="py-2.5 px-4 font-mono text-slate-300">{{ (lr.start_date or '')[:10] }}</td>
+              <td class="py-2.5 px-4 font-mono text-slate-300">{{ (lr.end_date or '')[:10] }}</td>
+              <td class="py-2.5 px-4 font-bold text-white">{{ lr.total_days }}</td>
+              <td class="py-2.5 px-4">
+                {% set s = lr.status or 'Pending' %}
+                <span class="font-semibold px-2 py-0.5 rounded-full
+                  {% if s == 'Approved' %}text-emerald-400 bg-emerald-400/10
+                  {% elif s == 'Rejected' %}text-rose-400 bg-rose-400/10
+                  {% else %}text-amber-400 bg-amber-400/10{% endif %}">{{ s }}</span>
+              </td>
+              <td class="py-2.5 px-4 text-slate-400 max-w-[200px] truncate">{{ lr.reason or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-8 text-center text-slate-500 text-sm">No leave requests.</div>
+      {% endif %}
+    </div>
+
+    <!-- Payroll -->
+    <div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+      <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white">💳 Payroll History</h3>
+        <span class="text-xs text-slate-400">Total paid: <span class="text-emerald-400 font-bold">MMK {{ '{:,.0f}'.format(total_paid) }}</span></span>
+      </div>
+      {% if payroll_records %}
+      <div class="overflow-x-auto max-h-56 overflow-y-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-surface-850 sticky top-0 z-10">
+            <tr>{% for h in ['Month','Basic','Allowances','Deductions','Bonus','Net Salary','Status'] %}<th class="text-left py-2.5 px-4 text-slate-400 font-semibold uppercase tracking-wider">{{ h }}</th>{% endfor %}</tr>
+          </thead>
+          <tbody class="divide-y divide-white/3">
+            {% for p in payroll_records %}
+            <tr class="hover:bg-white/2">
+              <td class="py-2.5 px-4 font-mono text-slate-300">{{ p.month or '—' }}</td>
+              <td class="py-2.5 px-4 text-slate-300">{{ '{:,.0f}'.format(p.basic_salary or 0) }}</td>
+              <td class="py-2.5 px-4 text-emerald-400">+{{ '{:,.0f}'.format(p.allowances or 0) }}</td>
+              <td class="py-2.5 px-4 text-rose-400">-{{ '{:,.0f}'.format(p.deductions or 0) }}</td>
+              <td class="py-2.5 px-4 text-amber-400">+{{ '{:,.0f}'.format(p.bonus or 0) }}</td>
+              <td class="py-2.5 px-4 font-bold text-white">{{ '{:,.0f}'.format(p.net_salary or 0) }}</td>
+              <td class="py-2.5 px-4">
+                {% set ps = p.payment_status or 'Pending' %}
+                <span class="font-semibold {{ 'text-emerald-400' if ps == 'Paid' else 'text-amber-400' }}">{{ ps }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-8 text-center text-slate-500 text-sm">No payroll records.</div>
+      {% endif %}
+    </div>
+
+    <!-- KPIs -->
+    {% if kpi_records %}
+    <div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+      <div class="px-5 py-4 border-b border-white/5">
+        <h3 class="text-sm font-bold text-white">📊 KPI Performance</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-white/2">
+            <tr>{% for h in ['Period','Target','Actual','Achievement','Comment'] %}<th class="text-left py-2.5 px-4 text-slate-400 font-semibold uppercase tracking-wider">{{ h }}</th>{% endfor %}</tr>
+          </thead>
+          <tbody class="divide-y divide-white/3">
+            {% for k in kpi_records %}
+            {% set target = k.target_score | float %}
+            {% set actual = k.actual_score | float %}
+            {% set achieve = ((actual / target * 100) | int) if target > 0 else 0 %}
+            <tr class="hover:bg-white/2">
+              <td class="py-2.5 px-4 font-mono text-slate-300">{{ k.recent_period or '—' }}</td>
+              <td class="py-2.5 px-4 text-slate-300">{{ target | int }}</td>
+              <td class="py-2.5 px-4 font-bold text-white">{{ actual | int }}</td>
+              <td class="py-2.5 px-4">
+                <div class="flex items-center gap-2">
+                  <div class="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full {{ 'bg-emerald-500' if achieve >= 100 else ('bg-amber-500' if achieve >= 70 else 'bg-rose-500') }}"
+                      style="width: {{ [achieve, 100]|min }}%"></div>
+                  </div>
+                  <span class="font-bold {{ 'text-emerald-400' if achieve >= 100 else ('text-amber-400' if achieve >= 70 else 'text-rose-400') }}">{{ achieve }}%</span>
+                </div>
+              </td>
+              <td class="py-2.5 px-4 text-slate-400 max-w-[220px] truncate">{{ k.review_comment or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Onboarding -->
+    {% if onboarding %}
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-5">
+      <h3 class="text-sm font-bold text-white mb-3">🎯 Onboarding Status</h3>
+      {% set total_tasks = onboarding_tasks|length %}
+      {% set done_tasks  = onboarding_tasks|selectattr('status','equalto','Completed')|list|length %}
+      {% set pct = (done_tasks / total_tasks * 100)|int if total_tasks > 0 else 0 %}
+      <div class="flex items-center gap-4 mb-4">
+        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+          <div class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-500" style="width: {{ pct }}%"></div>
+        </div>
+        <span class="text-sm font-bold text-white">{{ pct }}%</span>
+        <span class="text-xs text-slate-400">{{ done_tasks }}/{{ total_tasks }} tasks</span>
+      </div>
+      {% if onboarding_tasks %}
+      <div class="grid grid-cols-2 gap-2">
+        {% for t in onboarding_tasks %}
+        <div class="flex items-center gap-2 bg-white/3 rounded-lg px-3 py-2">
+          <span class="text-sm">{{ '✅' if t.status == 'Completed' else '⏳' }}</span>
+          <span class="text-xs text-slate-300 truncate">{{ t.task_name or '—' }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Recruitment history (if came through pipeline) -->
+    {% if recruitment_record %}
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-5">
+      <h3 class="text-sm font-bold text-white mb-3">📝 Recruitment Record</h3>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+        {% for label, val in [
+          ('Applied Position', recruitment_record.position_title),
+          ('Final Status', recruitment_record.stage),
+          ('Applied Date', (recruitment_record.created_at or '')[:10]),
+          ('Source', recruitment_record.source),
+          ('Offer Sent', recruitment_record.offer_sent),
+          ('Interviewed', recruitment_record.interviewed)
+        ] %}
+        {% if val %}
+        <div class="bg-white/5 rounded-xl px-3 py-2">
+          <p class="text-slate-500 mb-0.5">{{ label }}</p>
+          <p class="font-semibold text-white">{{ val }}</p>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

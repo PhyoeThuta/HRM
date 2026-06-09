@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Offboarding & Clearance — CorpHRM{% endblock %}
+{% block page_title %}Corporate Offboarding & Asset Clearance{% endblock %}
+{% block page_subtitle %}Real-time clearance tracking with automated payroll release logic{% endblock %}
+
+{% block content %}
+
+<!-- Stats Row -->
+<div class="grid grid-cols-3 gap-5 mb-8">
+  <div class="rounded-2xl bg-surface-800 border border-white/10 p-5 flex items-center gap-4">
+    <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center flex-shrink-0">
+      <svg class="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+    </div>
+    <div>
+      <p class="text-3xl font-bold text-white">{{ stats.total }}</p>
+      <p class="text-xs text-slate-400 mt-0.5 font-medium">Total Offboarding Cases</p>
+    </div>
+  </div>
+  <div class="rounded-2xl bg-surface-800 border border-emerald-500/20 p-5 flex items-center gap-4">
+    <div class="w-12 h-12 rounded-2xl bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+      <svg class="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </div>
+    <div>
+      <p class="text-3xl font-bold text-white">{{ stats.cleared }}</p>
+      <p class="text-xs text-slate-400 mt-0.5 font-medium">Settlement Released</p>
+    </div>
+  </div>
+  <div class="rounded-2xl bg-surface-800 border border-rose-500/20 p-5 flex items-center gap-4">
+    <div class="w-12 h-12 rounded-2xl bg-rose-500/15 flex items-center justify-center flex-shrink-0">
+      <svg class="w-6 h-6 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    </div>
+    <div>
+      <p class="text-3xl font-bold text-white">{{ stats.on_hold }}</p>
+      <p class="text-xs text-slate-400 mt-0.5 font-medium">Hold Final Payroll</p>
+    </div>
+  </div>
+</div>
+
+<!-- Logic Banner -->
+<div class="rounded-2xl bg-gradient-to-r from-brand-900/50 to-purple-900/30 border border-brand-500/20 p-5 mb-8 flex items-start gap-4">
+  <div class="w-10 h-10 rounded-xl bg-brand-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+    <svg class="w-5 h-5 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+  </div>
+  <div>
+    <p class="text-sm font-bold text-white mb-1">Automated Settlement Logic Active</p>
+    <p class="text-xs text-slate-300">When <code class="text-brand-400 bg-brand-500/10 px-1 py-0.5 rounded">laptop_returned</code> ∧ <code class="text-brand-400 bg-brand-500/10 px-1 py-0.5 rounded">access_card_returned</code> ∧ <code class="text-brand-400 bg-brand-500/10 px-1 py-0.5 rounded">nda_signed</code> are all <span class="text-emerald-400 font-bold">TRUE</span>, the system automatically calls <code class="text-amber-300 bg-amber-500/10 px-1 py-0.5 rounded">supabase.update(settlement_status = "Release Final Settlement")</code>. Toggle checkboxes below to trigger this live.</p>
+  </div>
+</div>
+
+<!-- Offboarding Cards -->
+<div class="space-y-5">
+  {% for rec in records %}
+  {% set is_cleared = rec.laptop_returned and rec.access_card_returned and rec.nda_signed %}
+  <div class="rounded-2xl bg-surface-800 border {{ 'border-emerald-500/30' if is_cleared else 'border-rose-500/20' }} overflow-hidden transition-all duration-500"
+       id="card-{{ rec.id }}">
+
+    <!-- Card Header -->
+    <div class="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br {{ 'from-emerald-500 to-teal-600' if is_cleared else 'from-rose-500 to-pink-600' }} flex items-center justify-center text-lg font-black text-white shadow-lg">
+          {{ rec.Full_name[0] if rec.Full_name else '?' }}
+        </div>
+        <div>
+          <h3 class="font-bold text-white text-base">{{ rec.Full_name or '—' }}</h3>
+          <div class="flex items-center gap-3 mt-0.5">
+            <span class="font-mono text-xs text-brand-400">{{ rec.employee_id or '—' }}</span>
+            <span class="text-slate-500 text-xs">·</span>
+            <span class="text-xs text-slate-400">{{ rec.department or '—' }}</span>
+            <span class="text-slate-500 text-xs">·</span>
+            <span class="text-xs text-slate-400">Term: {{ rec.termination_date or '—' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settlement Status Badge -->
+      <div id="status-badge-{{ rec.id }}">
+        {% if is_cleared %}
+          <div class="flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-4 py-2">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div>
+              <p class="text-xs font-bold text-emerald-400">Release Final Settlement</p>
+              <p class="text-[10px] text-emerald-300/60">All cleared · Supabase updated ✓</p>
+            </div>
+          </div>
+        {% else %}
+          <div class="flex items-center gap-2 bg-rose-500/15 border border-rose-500/30 rounded-xl px-4 py-2">
+            <svg class="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <div>
+              <p class="text-xs font-bold text-rose-400">Hold Final Payroll</p>
+              <p class="text-[10px] text-rose-300/60">Pending clearance items</p>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Clearance Checkboxes -->
+    <div class="px-6 py-5 grid grid-cols-3 gap-4">
+
+      <!-- Laptop Returned -->
+      <div class="clearance-item rounded-xl border {{ 'border-emerald-500/30 bg-emerald-500/5' if rec.laptop_returned else 'border-white/10 bg-white/2' }} p-4 transition-all duration-300"
+           id="item-{{ rec.id }}-laptop_returned">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-8 h-8 rounded-lg {{ 'bg-emerald-500/20' if rec.laptop_returned else 'bg-white/5' }} flex items-center justify-center">
+            <svg class="w-4 h-4 {{ 'text-emerald-400' if rec.laptop_returned else 'text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox"
+                   id="chk-{{ rec.id }}-laptop_returned"
+                   class="sr-only peer"
+                   {{ 'checked' if rec.laptop_returned else '' }}
+                   onchange="toggleClearance({{ rec.id }}, 'laptop_returned', this.checked)"
+                   {% if is_cleared and rec.laptop_returned %}{% endif %}>
+            <div class="w-10 h-5 bg-white/10 peer-focus:ring-2 peer-focus:ring-brand-500/50 rounded-full peer
+                        peer-checked:bg-emerald-500 transition-colors duration-300"></div>
+            <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300
+                        peer-checked:translate-x-5"></div>
+          </label>
+        </div>
+        <p class="text-sm font-bold {{ 'text-emerald-400' if rec.laptop_returned else 'text-slate-300' }}">
+          Laptop Returned
+        </p>
+        <p class="text-xs {{ 'text-emerald-400/70' if rec.laptop_returned else 'text-slate-500' }} mt-0.5">
+          {{ '✓ Confirmed' if rec.laptop_returned else '⏳ Pending' }}
+        </p>
+      </div>
+
+      <!-- Access Card Returned -->
+      <div class="clearance-item rounded-xl border {{ 'border-emerald-500/30 bg-emerald-500/5' if rec.access_card_returned else 'border-white/10 bg-white/2' }} p-4 transition-all duration-300"
+           id="item-{{ rec.id }}-access_card_returned">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-8 h-8 rounded-lg {{ 'bg-emerald-500/20' if rec.access_card_returned else 'bg-white/5' }} flex items-center justify-center">
+            <svg class="w-4 h-4 {{ 'text-emerald-400' if rec.access_card_returned else 'text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2"/>
+            </svg>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox"
+                   id="chk-{{ rec.id }}-access_card_returned"
+                   class="sr-only peer"
+                   {{ 'checked' if rec.access_card_returned else '' }}
+                   onchange="toggleClearance({{ rec.id }}, 'access_card_returned', this.checked)">
+            <div class="w-10 h-5 bg-white/10 peer-focus:ring-2 peer-focus:ring-brand-500/50 rounded-full peer
+                        peer-checked:bg-emerald-500 transition-colors duration-300"></div>
+            <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300
+                        peer-checked:translate-x-5"></div>
+          </label>
+        </div>
+        <p class="text-sm font-bold {{ 'text-emerald-400' if rec.access_card_returned else 'text-slate-300' }}">
+          Access Card Returned
+        </p>
+        <p class="text-xs {{ 'text-emerald-400/70' if rec.access_card_returned else 'text-slate-500' }} mt-0.5">
+          {{ '✓ Confirmed' if rec.access_card_returned else '⏳ Pending' }}
+        </p>
+      </div>
+
+      <!-- NDA Signed -->
+      <div class="clearance-item rounded-xl border {{ 'border-emerald-500/30 bg-emerald-500/5' if rec.nda_signed else 'border-white/10 bg-white/2' }} p-4 transition-all duration-300"
+           id="item-{{ rec.id }}-nda_signed">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-8 h-8 rounded-lg {{ 'bg-emerald-500/20' if rec.nda_signed else 'bg-white/5' }} flex items-center justify-center">
+            <svg class="w-4 h-4 {{ 'text-emerald-400' if rec.nda_signed else 'text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox"
+                   id="chk-{{ rec.id }}-nda_signed"
+                   class="sr-only peer"
+                   {{ 'checked' if rec.nda_signed else '' }}
+                   onchange="toggleClearance({{ rec.id }}, 'nda_signed', this.checked)">
+            <div class="w-10 h-5 bg-white/10 peer-focus:ring-2 peer-focus:ring-brand-500/50 rounded-full peer
+                        peer-checked:bg-emerald-500 transition-colors duration-300"></div>
+            <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300
+                        peer-checked:translate-x-5"></div>
+          </label>
+        </div>
+        <p class="text-sm font-bold {{ 'text-emerald-400' if rec.nda_signed else 'text-slate-300' }}">
+          NDA Signed
+        </p>
+        <p class="text-xs {{ 'text-emerald-400/70' if rec.nda_signed else 'text-slate-500' }} mt-0.5">
+          {{ '✓ Confirmed' if rec.nda_signed else '⏳ Pending' }}
+        </p>
+      </div>
+
+    </div><!-- /Clearance Items -->
+
+    <!-- Progress Bar -->
+    {% set cleared_count = (1 if rec.laptop_returned else 0) + (1 if rec.access_card_returned else 0) + (1 if rec.nda_signed else 0) %}
+    <div class="px-6 pb-5">
+      <div class="flex items-center justify-between mb-1.5">
+        <p class="text-xs text-slate-400">Clearance Progress</p>
+        <p class="text-xs font-bold {{ 'text-emerald-400' if is_cleared else 'text-slate-300' }}" id="progress-text-{{ rec.id }}">
+          {{ cleared_count }}/3 items cleared
+        </p>
+      </div>
+      <div class="h-2 bg-white/5 rounded-full overflow-hidden">
+        <div id="progress-bar-{{ rec.id }}"
+             class="h-full rounded-full transition-all duration-700
+                    {{ 'bg-emerald-500' if is_cleared else 'bg-brand-500' }}"
+             style="width: {{ (cleared_count / 3 * 100)|int }}%"></div>
+      </div>
+    </div>
+
+  </div><!-- /card -->
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Track current state of all checkboxes per card
+const cardState = {};
+{% for rec in records %}
+cardState[{{ rec.id }}] = {
+  laptop_returned: {{ 'true' if rec.laptop_returned else 'false' }},
+  access_card_returned: {{ 'true' if rec.access_card_returned else 'false' }},
+  nda_signed: {{ 'true' if rec.nda_signed else 'false' }},
+};
+{% endfor %}
+
+async function toggleClearance(id, field, value) {
+  // Update local state
+  cardState[id][field] = value;
+
+  // Update item UI
+  const item = document.getElementById(`item-${id}-${field}`);
+  if (item) {
+    if (value) {
+      item.classList.remove('border-white/10', 'bg-white/2');
+      item.classList.add('border-emerald-500/30', 'bg-emerald-500/5');
+    } else {
+      item.classList.remove('border-emerald-500/30', 'bg-emerald-500/5');
+      item.classList.add('border-white/10', 'bg-white/2');
+    }
+  }
+
+  // Compute cleared count
+  const state = cardState[id];
+  const clearedCount = Object.values(state).filter(Boolean).length;
+  const allCleared = clearedCount === 3;
+
+  // Update progress bar
+  const bar = document.getElementById(`progress-bar-${id}`);
+  const txt = document.getElementById(`progress-text-${id}`);
+  if (bar) {
+    bar.style.width = `${Math.round(clearedCount / 3 * 100)}%`;
+    bar.className = `h-full rounded-full transition-all duration-700 ${allCleared ? 'bg-emerald-500' : 'bg-brand-500'}`;
+  }
+  if (txt) {
+    txt.textContent = `${clearedCount}/3 items cleared`;
+    txt.className = `text-xs font-bold ${allCleared ? 'text-emerald-400' : 'text-slate-300'}`;
+  }
+
+  // Update card border
+  const card = document.getElementById(`card-${id}`);
+  if (card) {
+    card.className = card.className.replace(/border-\w+-(500|400)\/(20|30)/g, '');
+    if (allCleared) {
+      card.classList.add('border-emerald-500/30');
+      card.classList.remove('border-rose-500/20');
+    } else {
+      card.classList.add('border-rose-500/20');
+      card.classList.remove('border-emerald-500/30');
+    }
+  }
+
+  // AJAX call to backend
+  try {
+    const res = await fetch('/api/offboarding/toggle', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id, field, value, all_checks: state }),
+    });
+    const data = await res.json();
+
+    // Update settlement status badge
+    const badge = document.getElementById(`status-badge-${id}`);
+    if (badge) {
+      if (data.all_cleared) {
+        badge.innerHTML = `
+          <div class="flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 rounded-xl px-4 py-2 transition-all">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div>
+              <p class="text-xs font-bold text-emerald-400">Release Final Settlement</p>
+              <p class="text-[10px] text-emerald-300/60">All cleared · Supabase updated ✓</p>
+            </div>
+          </div>`;
+      } else {
+        badge.innerHTML = `
+          <div class="flex items-center gap-2 bg-rose-500/15 border border-rose-500/30 rounded-xl px-4 py-2 transition-all">
+            <svg class="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <div>
+              <p class="text-xs font-bold text-rose-400">Hold Final Payroll</p>
+              <p class="text-[10px] text-rose-300/60">Pending clearance items</p>
+            </div>
+          </div>`;
+      }
+    }
+    // Show toast
+    if (data.all_cleared) {
+      showToast('✅ All items cleared — Final Settlement Released & Supabase updated!', 'success');
+    } else {
+      showToast(`Clearance updated: ${clearedCount}/3 items confirmed`, 'info');
+    }
+  } catch(e) {
+    console.warn('API call failed (mock mode):', e);
+    showToast('Running in mock mode — toggle saved locally', 'info');
+  }
+}
+</script>
+{% endblock %}

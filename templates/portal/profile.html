@@ -1,0 +1,94 @@
+{% extends "portal/base.html" %}
+{% block title %}My Profile — Employee Portal{% endblock %}
+{% block page_title %}My Profile 👤{% endblock %}
+{% block page_subtitle %}Your personal and employment details{% endblock %}
+
+{% block content %}
+{% if emp %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+  <!-- Profile Card -->
+  <div class="lg:col-span-1">
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-6 text-center">
+      <div class="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-4xl font-black text-white mx-auto mb-4 shadow-xl shadow-indigo-500/20">
+        {{ (emp.Full_name or 'E')[0] }}
+      </div>
+      <h2 class="text-lg font-black text-white">{{ emp.Full_name }}</h2>
+      <p class="text-sm text-indigo-400 font-semibold mt-0.5">{{ emp.pos_title or 'Employee' }}</p>
+      <p class="text-xs text-slate-500 mt-0.5">{{ dept.Department_name if dept else '' }}</p>
+      <div class="mt-4 flex items-center justify-center gap-2">
+        {% if emp.status == 'Active' %}
+        <span class="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Active
+        </span>
+        {% else %}
+        <span class="text-xs font-bold text-slate-400 bg-white/5 px-3 py-1 rounded-full">{{ emp.status or 'Unknown' }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Details -->
+  <div class="lg:col-span-2 space-y-4">
+    <div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-white/5">
+        <h3 class="text-sm font-bold text-white">Personal Information</h3>
+      </div>
+      <div class="divide-y divide-white/5">
+        {% for label, val in [
+          ("Employee ID",    emp.employee_id or "—"),
+          ("Full Name",      emp.Full_name or "—"),
+          ("Email",          emp.email or "—"),
+          ("Phone",          emp.phone or "—"),
+          ("Date of Birth",  (emp.dob or "")[:10] or "—"),
+          ("National ID",    emp.national_id or "—"),
+          ("Address",        emp.address or "—"),
+        ] %}
+        <div class="px-5 py-3 flex items-center gap-4">
+          <span class="text-xs text-slate-500 w-36 flex-shrink-0">{{ label }}</span>
+          <span class="text-sm text-white font-medium">{{ val }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-white/5">
+        <h3 class="text-sm font-bold text-white">Employment Details</h3>
+      </div>
+      <div class="divide-y divide-white/5">
+        {% for label, val in [
+          ("Department",       dept.Department_name if dept else "—"),
+          ("Position",         emp.pos_title or "—"),
+          ("Employment Type",  emp.employment_type or "—"),
+          ("Join Date",        (emp.hire_date or "")[:10] or "—"),
+          ("Work Location",    emp.work_location or "Office"),
+          ("Manager",          emp.manager_name or "—"),
+        ] %}
+        <div class="px-5 py-3 flex items-center gap-4">
+          <span class="text-xs text-slate-500 w-36 flex-shrink-0">{{ label }}</span>
+          <span class="text-sm text-white font-medium">{{ val }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="rounded-2xl bg-amber-500/5 border border-amber-500/15 p-4 flex items-start gap-3">
+      <span class="text-xl flex-shrink-0">🔒</span>
+      <div>
+        <p class="text-xs font-semibold text-amber-400">Profile Update</p>
+        <p class="text-xs text-slate-400 mt-0.5">To update your personal information, contact HR directly. Salary and sensitive information is not shown here.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="rounded-2xl bg-surface-800 border border-white/5 p-16 text-center">
+  <div class="text-5xl mb-3">🔗</div>
+  <p class="text-lg font-bold text-white mb-2">Account Not Linked</p>
+  <p class="text-slate-400 text-sm">Your login account is not connected to an employee record.</p>
+  <p class="text-slate-500 text-xs mt-2">Please ask HR to link your account in the User Accounts section.</p>
+</div>
+{% endif %}
+{% endblock %}

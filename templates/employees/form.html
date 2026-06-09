@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if action == 'edit' else 'Add' }} Employee — CorpHRM{% endblock %}
+{% block page_title %}{{ 'Edit Employee' if action == 'edit' else 'Add New Employee' }}{% endblock %}
+{% block page_subtitle %}{{ employee.Full_name if employee else 'Fill in the details below' }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+  <div class="rounded-2xl bg-surface-800 border border-white/5 overflow-hidden">
+    <div class="px-6 py-4 border-b border-white/5">
+      <h2 class="text-sm font-bold text-white">Employee Information</h2>
+    </div>
+    <form method="post" action="/employees/{{ employee.id if action == 'edit' else '' }}/{{ action }}" class="p-6 space-y-5">
+      <div class="grid grid-cols-2 gap-4">
+        {% if action == 'add' %}
+        {% if candidates %}
+        <div class="col-span-2 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 mb-2">
+          <label class="form-label text-indigo-300">Link Hired Candidate (Optional)</label>
+          <select id="cand_select" class="form-input border-indigo-500/30 bg-surface-900" onchange="autofillCandidate()">
+            <option value="">— Select Candidate —</option>
+            {% for c in candidates %}
+            <option value="{{ c.id }}" data-name="{{ c.full_name }}" data-email="{{ c.email or '' }}" data-phone="{{ c.phone or '' }}" data-pos="{{ c.position_id or '' }}">{{ c.full_name }} ({{ c.email or 'No email' }})</option>
+            {% endfor %}
+          </select>
+          <p class="text-xs text-indigo-400/70 mt-1">Selecting a candidate will automatically fill in their details below.</p>
+        </div>
+        <script>
+          function autofillCandidate() {
+            const sel = document.getElementById('cand_select');
+            if(!sel.value) return;
+            const opt = sel.options[sel.selectedIndex];
+            document.querySelector('input[name="Full_name"]').value = opt.dataset.name;
+            document.querySelector('input[name="email"]').value = opt.dataset.email;
+            document.querySelector('input[name="phone"]').value = opt.dataset.phone;
+            if(opt.dataset.pos) document.querySelector('select[name="position_id"]').value = opt.dataset.pos;
+          }
+        </script>
+        {% endif %}
+        <div>
+          <label class="form-label">Employee ID *</label>
+          <input type="text" name="employee_id" required class="form-input" placeholder="EMP001"/>
+        </div>
+        {% endif %}
+        <div class="{{ '' if action == 'add' else 'col-span-2' }}">
+          <label class="form-label">Full Name *</label>
+          <input type="text" name="Full_name" required class="form-input" value="{{ employee.Full_name if employee else '' }}"/>
+        </div>
+        <div>
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-input" value="{{ employee.email if employee else '' }}"/>
+        </div>
+        <div>
+          <label class="form-label">Phone</label>
+          <input type="text" name="phone" class="form-input" value="{{ employee.phone if employee else '' }}"/>
+        </div>
+        <div>
+          <label class="form-label">Department</label>
+          <select name="Dept_id" class="form-input">
+            <option value="">— Select —</option>
+            {% for d in departments %}
+            <option value="{{ d.id }}" {{ 'selected' if employee and employee.Dept_id == d.id else '' }}>{{ d.Department_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Position</label>
+          <select name="position_id" class="form-input">
+            <option value="">— Select —</option>
+            {% for p in positions %}
+            <option value="{{ p.id }}" {{ 'selected' if employee and employee.position_id == p.id else '' }}>{{ p.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Manager</label>
+          <select name="Manager_id" class="form-input">
+            <option value="">— No Manager —</option>
+            {% for m in managers %}
+            {% if not employee or m.id != employee.id %}
+            <option value="{{ m.id }}" {{ 'selected' if employee and employee.Manager_id == m.id else '' }}>{{ m.Full_name }} ({{ m.employee_id }})</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Status</label>
+          <select name="status" class="form-input">
+            {% for s in ['Active','On Leave','Inactive','Offboarding','Terminated'] %}
+            <option value="{{ s }}" {{ 'selected' if employee and employee.status == s else '' }}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Hire Date</label>
+          <input type="date" name="hire_date" class="form-input" value="{{ employee.hire_date if employee else '' }}"/>
+        </div>
+        <div>
+          <label class="form-label">Date of Birth</label>
+          <input type="date" name="date_of_birth" class="form-input" value="{{ employee.date_of_birth if employee else '' }}"/>
+        </div>
+        <div>
+          <label class="form-label">Salary (USD)</label>
+          <input type="number" name="salary" step="0.01" class="form-input" value="{{ employee.salary if employee else '' }}" placeholder="0.00"/>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 pt-2 border-t border-white/5">
+        <a href="/employees" class="text-sm text-slate-400 hover:text-white px-4 py-2.5 rounded-xl bg-white/5 transition-colors">← Back</a>
+        <button type="submit" class="text-sm font-semibold text-white px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition-colors">
+          {{ 'Save Changes' if action == 'edit' else 'Add Employee' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
