@@ -2877,6 +2877,14 @@ async def api_boss_chat(request: Request):
             nid = v.get("nominee_id")
             if nid:
                 vote_stats.setdefault(nid, []).append(int(v.get("score") or 0))
+                
+        # 4. Attendance
+        attendance = db_fetch("attendance_records", "employee_id,check_in,check_out,is_late")
+        att_stats = {}
+        for a in attendance:
+            eid = a.get("employee_id")
+            if eid:
+                att_stats.setdefault(eid, []).append(a)
         
         # Build Context String
         context_lines = ["--- HR DATABASE CONTEXT ---"]
@@ -2898,7 +2906,19 @@ async def api_boss_chat(request: Request):
             emp_votes = vote_stats.get(str(eid), [])
             vote_str = f"Votes Avg: {sum(emp_votes)/len(emp_votes):.1f} ({len(emp_votes)} votes)" if emp_votes else "No votes"
             
-            line = f"Employee: {emp.get('Full_name')} (ID: {emp.get('employee_id')}), Dept: {dname}, Pos: {pname}, Status: {status} | {kpi_str} | {vote_str}"
+            # Find attendance
+            emp_att = att_stats.get(str(eid), [])
+            months = {}
+            for a in emp_att:
+                ci = a.get("check_in")
+                if ci and len(ci) >= 7:
+                    month = ci[:7] # YYYY-MM
+                    months[month] = months.get(month, 0) + 1
+            att_summary = ", ".join([f"{m}: {c} days" for m, c in months.items()])
+            late_count = sum(1 for a in emp_att if a.get("is_late"))
+            att_str = f"Attendance: {att_summary} | Total late: {late_count}" if emp_att else "No attendance records"
+            
+            line = f"Employee: {emp.get('Full_name')} (ID: {emp.get('employee_id')}), Dept: {dname}, Pos: {pname}, Status: {status} | {kpi_str} | {vote_str} | {att_str}"
             context_lines.append(line)
         
         context_text = "\n".join(context_lines)
