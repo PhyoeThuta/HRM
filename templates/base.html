@@ -87,6 +87,7 @@
     <p class="px-3 pt-4 pb-1 text-[10px] font-bold text-amber-500/60 uppercase tracking-widest">Administration</p>
     {% if current_user and current_user.role == 'boss' %}
     {{ nav_item("boss", "/boss", "Executive Overview", "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z") }}
+    {{ nav_item("boss_chat", "/boss/chat", "AI Assistant", "M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z") }}
     <a href="/boss/kpi" id="nav-boss-kpi"
        class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-slate-400 hover:bg-white/5 hover:text-white">
       <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-white/5">

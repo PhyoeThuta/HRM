@@ -2837,5 +2837,94 @@ async def portal_absent_sop(request: Request, sop_id: str):
     
     return redirect_with_msg("/portal/sops", success="SOP+marked+as+missed+due+to+absence")
 
+# ── Boss Chatbot RAG ────────────────────────────────────────────────────────
+@app.get("/boss/chat", response_class=HTMLResponse)
+async def boss_chat_page(request: Request):
+    user = get_current_user(request)
+    if not user or user.get("role") != "boss":
+        return redirect_with_msg("/dashboard", error="Unauthorized")
+    return templates.TemplateResponse("boss/chat.html", ctx(request, "boss_chat"))
+
+@app.post("/api/boss/chat", response_class=JSONResponse)
+async def api_boss_chat(request: Request):
+    user = get_current_user(request)
+    if not user or user.get("role") != "boss":
+        return JSONResponse({"error": "Unauthorized"}, status_code=403)
+    
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+        
+    message = data.get("message", "").strip()
+    if not message:
+        return JSONResponse({"error": "Empty message"}, status_code=400)
+    
+    try:
+        # Fetch Context Data for RAG
+        # 1. Employees
+        employees = db_fetch("Employees", "id,employee_id,Full_name,status,Dept_id,position_id")
+        depts = {d["id"]: d.get("Department_name", "") for d in db_fetch("Departments", "id,Department_name")}
+        pos = {p["id"]: p.get("title", "") for p in db_fetch("positions", "id,title")}
+        
+        # 2. KPIs
+        kpis = db_fetch("kpis", "employee_id,recent_period,target_score,actual_score,review_comment")
+        
+        # 3. Peer Votes
+        votes = db_fetch("peer_voting_records", "nominee_id,score")
+        vote_stats = {}
+        for v in votes:
+            nid = v.get("nominee_id")
+            if nid:
+                vote_stats.setdefault(nid, []).append(int(v.get("score") or 0))
+        
+        # Build Context String
+        context_lines = ["--- HR DATABASE CONTEXT ---"]
+        for emp in employees:
+            eid = emp.get("id")
+            if not eid: continue
+            dname = depts.get(emp.get("Dept_id"), "None")
+            pname = pos.get(emp.get("position_id"), "None")
+            status = emp.get("status", "Unknown")
+            
+            # Find KPI for employee
+            emp_kpis = [k for k in kpis if k.get("employee_id") == str(eid)]
+            kpi_str = "No recent KPI"
+            if emp_kpis:
+                latest_kpi = emp_kpis[-1]
+                kpi_str = f"KPI: {latest_kpi.get('actual_score')}/{latest_kpi.get('target_score')} ({latest_kpi.get('review_comment')})"
+                
+            # Find votes
+            emp_votes = vote_stats.get(str(eid), [])
+            vote_str = f"Votes Avg: {sum(emp_votes)/len(emp_votes):.1f} ({len(emp_votes)} votes)" if emp_votes else "No votes"
+            
+            line = f"Employee: {emp.get('Full_name')} (ID: {emp.get('employee_id')}), Dept: {dname}, Pos: {pname}, Status: {status} | {kpi_str} | {vote_str}"
+            context_lines.append(line)
+        
+        context_text = "\n".join(context_lines)
+        
+        # Construct Prompt
+        system_prompt = (
+            "You are an AI HR Assistant for the Boss. You must answer questions based strictly on the provided HR Database Context. "
+            "You support answering in both Burmese and English, matching the language of the user's prompt. "
+            "If the user asks in Burmese, reply in natural, professional Burmese. If in English, reply in English. "
+            "Do not invent data; if the information is not in the context, say so gracefully. "
+            "Use Markdown for formatting if helpful (e.g., bold names, bullet points)."
+        )
+        
+        full_prompt = f"{system_prompt}\n\n{context_text}\n\nBoss asks: {message}"
+        
+        # Call Gemini
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content(full_prompt)
+        reply = response.text
+        
+        return JSONResponse({"reply": reply})
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 if __name__ == "__main__":
     uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=False)

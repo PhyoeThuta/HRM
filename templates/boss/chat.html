@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}AI Assistant | Boss Panel{% endblock %}
+{% block page_title %}AI Assistant{% endblock %}
+{% block page_subtitle %}Ask questions about HRM data in Burmese or English{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto h-[calc(100vh-12rem)] flex flex-col bg-surface-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+    
+    <!-- Chat Header -->
+    <div class="px-6 py-4 border-b border-white/5 bg-surface-850 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
+                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"/>
+                </svg>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-white">HR Intelligence Agent</h2>
+                <p class="text-xs text-indigo-400">Powered by Google Gemini RAG</p>
+            </div>
+        </div>
+        <div class="text-xs text-slate-400 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> DB Connected
+        </div>
+    </div>
+
+    <!-- Messages Container -->
+    <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-6 bg-surface-950">
+        <!-- Initial Welcome Message -->
+        <div class="flex gap-4 max-w-[85%]">
+            <div class="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0 mt-1">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+            </div>
+            <div class="bg-surface-850 border border-white/5 rounded-2xl rounded-tl-sm px-5 py-3.5 shadow-sm text-sm text-slate-200">
+                <p>Hello boss! I am your HR Intelligence Agent. I can answer questions regarding employee performance, KPIs, attendance, and general HRM data.</p>
+                <p class="mt-2 text-indigo-300">You can ask me in English or Burmese. For example:</p>
+                <ul class="list-disc pl-5 mt-1 text-slate-400 space-y-1">
+                    <li>ဒီလ KPI အကောင်းဆုံးကဘယ်သူလဲ? (Who has the best KPI this month?)</li>
+                    <li>Employee John Doe အလုပ်တက်မှန်ရဲ့လား? (Is employee John Doe attending work regularly?)</li>
+                    <li>Who is currently on leave?</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="p-4 border-t border-white/5 bg-surface-900">
+        <form id="chat-form" class="relative flex items-center">
+            <textarea id="chat-input" rows="1" placeholder="Type your message here (English or Burmese)..." 
+                class="w-full bg-surface-950 border border-white/10 rounded-2xl pl-5 pr-14 py-3.5 text-sm text-white focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 resize-none transition-all"
+                style="min-height: 52px; max-height: 150px;"></textarea>
+            <button type="submit" id="send-btn" class="absolute right-2 p-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                </svg>
+            </button>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    const chatMessages = document.getElementById('chat-messages');
+    const sendBtn = document.getElementById('send-btn');
+
+    // Auto-resize textarea
+    chatInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+        if(this.value.trim() === '') {
+            sendBtn.disabled = true;
+        } else {
+            sendBtn.disabled = false;
+        }
+    });
+
+    chatInput.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if(this.value.trim() !== '') {
+                chatForm.dispatchEvent(new Event('submit'));
+            }
+        }
+    });
+
+    function appendUserMessage(text) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'flex gap-4 max-w-[85%] ml-auto justify-end';
+        msgDiv.innerHTML = `
+            <div class="bg-indigo-600 border border-indigo-500/50 rounded-2xl rounded-tr-sm px-5 py-3.5 shadow-sm text-sm text-white">
+                <p class="whitespace-pre-wrap">${text}</p>
+            </div>
+        `;
+        chatMessages.appendChild(msgDiv);
+        scrollToBottom();
+    }
+
+    function appendAIMessage(htmlContent, isLoading = false) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'flex gap-4 max-w-[85%] ai-message';
+        if (isLoading) msgDiv.id = 'loading-msg';
+        
+        const loaderHtml = isLoading ? `
+            <div class="flex space-x-1.5 h-6 items-center px-1">
+                <div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+                <div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                <div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+            </div>` : htmlContent;
+
+        msgDiv.innerHTML = `
+            <div class="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0 mt-1">
+                <svg class="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+            </div>
+            <div class="bg-surface-850 border border-white/5 rounded-2xl rounded-tl-sm px-5 py-3.5 shadow-sm text-sm text-slate-200 markdown-body">
+                ${loaderHtml}
+            </div>
+        `;
+        chatMessages.appendChild(msgDiv);
+        scrollToBottom();
+        return msgDiv;
+    }
+
+    function removeLoadingMessage() {
+        const loadingMsg = document.getElementById('loading-msg');
+        if (loadingMsg) {
+            loadingMsg.remove();
+        }
+    }
+
+    function scrollToBottom() {
+        chatMessages.scrollTo({
+            top: chatMessages.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
+
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = chatInput.value.trim();
+        if(!text) return;
+
+        // Reset input
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        sendBtn.disabled = true;
+
+        // Add user message
+        appendUserMessage(text);
+        
+        // Add loading indicator
+        appendAIMessage('', true);
+
+        try {
+            const response = await fetch('/api/boss/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+
+            const data = await response.json();
+            removeLoadingMessage();
+
+            if (response.ok) {
+                // Parse markdown
+                const parsedHtml = marked.parse(data.reply);
+                appendAIMessage(parsedHtml);
+            } else {
+                appendAIMessage(`<p class="text-rose-400">Error: ${data.error || 'Something went wrong.'}</p>`);
+            }
+        } catch (err) {
+            removeLoadingMessage();
+            appendAIMessage(`<p class="text-rose-400">Network Error: Could not reach the AI agent.</p>`);
+        }
+    });
+
+    // Make markdown styling match our theme
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .markdown-body p { margin-bottom: 0.75em; }
+        .markdown-body p:last-child { margin-bottom: 0; }
+        .markdown-body ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.75em; }
+        .markdown-body ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.75em; }
+        .markdown-body strong { color: #f8fafc; font-weight: 600; }
+        .markdown-body a { color: #818cf8; text-decoration: underline; }
+        .markdown-body h3 { color: #f8fafc; font-weight: 600; font-size: 1.1em; margin-top: 1em; margin-bottom: 0.5em; }
+    `;
+    document.head.appendChild(style);
+</script>
+{% endblock %}
