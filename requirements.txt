@@ -9,3 +9,4 @@ qrcode
 pypng
 google-generativeai
 PyPDF2
+bcrypt
