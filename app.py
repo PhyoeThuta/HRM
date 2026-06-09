@@ -2862,65 +2862,107 @@ async def api_boss_chat(request: Request):
     
     try:
         # Fetch Context Data for RAG
-        # 1. Employees
+        # 1. Employees & Core Lookup
         employees = db_fetch("Employees", "id,employee_id,Full_name,status,Dept_id,position_id")
         depts = {d["id"]: d.get("Department_name", "") for d in db_fetch("Departments", "id,Department_name")}
         pos = {p["id"]: p.get("title", "") for p in db_fetch("positions", "id,title")}
         
-        # 2. KPIs
+        # 2. Existing modules
         kpis = db_fetch("kpis", "employee_id,recent_period,target_score,actual_score,review_comment")
-        
-        # 3. Peer Votes
         votes = db_fetch("peer_voting_records", "nominee_id,score")
+        attendance = db_fetch("attendance_records", "employee_id,check_in,is_late")
+        
+        # 3. Leave Management
+        leave_reqs = db_fetch("Leave_Request", "employee_id,start_date,end_date,status,reason")
+        leave_bals = db_fetch("Leave_balances", "employee_id,remain_days,leave_type_id")
+        leave_types = {t["id"]: t.get("type_name", "") for t in db_fetch("Leave_type", "id,type_name")}
+        
+        # 4. Payrolls
+        payrolls = db_fetch("payrolls", "employee_id,month,net_salary,payment_status")
+        
+        # 5. SOPs
+        sops = db_fetch("daily_sops", "employee_id,assigned_date,is_completed,is_absent")
+        
+        # Build Employee Stats
         vote_stats = {}
         for v in votes:
             nid = v.get("nominee_id")
-            if nid:
-                vote_stats.setdefault(nid, []).append(int(v.get("score") or 0))
-                
-        # 4. Attendance
-        attendance = db_fetch("attendance_records", "employee_id,check_in,check_out,is_late")
+            if nid: vote_stats.setdefault(nid, []).append(int(v.get("score") or 0))
+            
         att_stats = {}
         for a in attendance:
             eid = a.get("employee_id")
-            if eid:
-                att_stats.setdefault(eid, []).append(a)
-        
-        # Build Context String
+            if eid: att_stats.setdefault(eid, []).append(a)
+            
         context_lines = ["--- HR DATABASE CONTEXT ---"]
+        context_lines.append("\n== EMPLOYEES ==")
+        
         for emp in employees:
             eid = emp.get("id")
             if not eid: continue
+            
             dname = depts.get(emp.get("Dept_id"), "None")
             pname = pos.get(emp.get("position_id"), "None")
             status = emp.get("status", "Unknown")
             
-            # Find KPI for employee
+            # KPIs
             emp_kpis = [k for k in kpis if k.get("employee_id") == str(eid)]
-            kpi_str = "No recent KPI"
-            if emp_kpis:
-                latest_kpi = emp_kpis[-1]
-                kpi_str = f"KPI: {latest_kpi.get('actual_score')}/{latest_kpi.get('target_score')} ({latest_kpi.get('review_comment')})"
-                
-            # Find votes
+            kpi_str = f"KPI: {emp_kpis[-1].get('actual_score')}/{emp_kpis[-1].get('target_score')}" if emp_kpis else "No KPI"
+            
+            # Votes
             emp_votes = vote_stats.get(str(eid), [])
             vote_str = f"Votes Avg: {sum(emp_votes)/len(emp_votes):.1f} ({len(emp_votes)} votes)" if emp_votes else "No votes"
             
-            # Find attendance
+            # Attendance
             emp_att = att_stats.get(str(eid), [])
             months = {}
             for a in emp_att:
                 ci = a.get("check_in")
                 if ci and len(ci) >= 7:
-                    month = ci[:7] # YYYY-MM
+                    month = ci[:7]
                     months[month] = months.get(month, 0) + 1
             att_summary = ", ".join([f"{m}: {c} days" for m, c in months.items()])
             late_count = sum(1 for a in emp_att if a.get("is_late"))
-            att_str = f"Attendance: {att_summary} | Total late: {late_count}" if emp_att else "No attendance records"
+            att_str = f"Att: {att_summary} (Late: {late_count})" if emp_att else "No att"
             
-            line = f"Employee: {emp.get('Full_name')} (ID: {emp.get('employee_id')}), Dept: {dname}, Pos: {pname}, Status: {status} | {kpi_str} | {vote_str} | {att_str}"
+            # Leave
+            emp_reqs = [l for l in leave_reqs if l.get("employee_id") == str(eid)]
+            req_str = ", ".join([f"{r.get('start_date')} to {r.get('end_date')} ({r.get('status')})" for r in emp_reqs[-2:]]) if emp_reqs else "No leaves"
+            emp_bals = [b for b in leave_bals if b.get("employee_id") == str(eid)]
+            bal_str = ", ".join([f"{leave_types.get(b.get('leave_type_id'), '?')}: {b.get('remain_days')} left" for b in emp_bals]) if emp_bals else "No balances"
+            
+            # Payroll
+            emp_pays = [p for p in payrolls if p.get("employee_id") == str(eid)]
+            pay_str = ", ".join([f"{p.get('month')}: ${p.get('net_salary')} ({p.get('payment_status')})" for p in emp_pays[-2:]]) if emp_pays else "No payroll"
+            
+            # SOPs
+            emp_sops = [s for s in sops if s.get("employee_id") == str(eid)]
+            completed = sum(1 for s in emp_sops if s.get("is_completed"))
+            sop_str = f"SOPs: {completed}/{len(emp_sops)} done" if emp_sops else "No SOPs"
+            
+            line = f"- {emp.get('Full_name')} ({emp.get('employee_id')}) | Dept:{dname} | Pos:{pname} | Status:{status} || {kpi_str} | {vote_str} || {att_str} || Leaves:{req_str} [{bal_str}] || Pay:{pay_str} || {sop_str}"
             context_lines.append(line)
+
+        # 6. Recruitment
+        candidates = db_fetch("recruitment_candidates", "full_name,position_id,status,created_at")
+        context_lines.append("\n== RECRUITMENT CANDIDATES ==")
+        for c in candidates:
+            pname = pos.get(c.get("position_id"), "None")
+            context_lines.append(f"- {c.get('full_name')} applied for {pname} | Status: {c.get('status')}")
+            
+        # 7. Onboarding & Offboarding
+        onboard = db_fetch("employee_onboarding", "employee_id,status,completion_pct")
+        offboard = db_fetch("corporate_offboarding", "employee_id,resignation_date,last_working_date,settlement_status")
         
+        context_lines.append("\n== ONBOARDING / OFFBOARDING ==")
+        emp_names = {str(e.get("id")): e.get("Full_name") for e in employees}
+        for o in onboard:
+            name = emp_names.get(o.get("employee_id"), "Unknown")
+            context_lines.append(f"- {name} Onboarding | Status: {o.get('status')} | Progress: {o.get('completion_pct')}%")
+        for o in offboard:
+            name = emp_names.get(o.get("employee_id"), "Unknown")
+            context_lines.append(f"- {name} Offboarding | Resigned: {o.get('resignation_date')} | Settlement: {o.get('settlement_status')}")
+
         context_text = "\n".join(context_lines)
         
         # Construct Prompt
