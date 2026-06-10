@@ -2196,12 +2196,12 @@ async def boss_kpi_delete(kpi_id: str):
 @app.post("/boss/users/{user_id}/edit", response_class=RedirectResponse)
 async def boss_users_edit(request: Request, user_id: str,
     full_name: str = Form(...), username: str = Form(...)):
-    user = getattr(request.state, "user", None)
+    user = get_current_user(request)
     if not user or user.get("role") != "boss":
         raise HTTPException(403, "Access denied")
     
     try:
-        db_update("sys_users", {"full_name": full_name, "username": username}, {"id": user_id})
+        db_update("sys_users", user_id, {"full_name": full_name, "username": username})
         return redirect_with_msg("/boss/users", success="User+account+updated")
     except Exception as e:
         return redirect_with_msg("/boss/users", error="Failed+to+update+user+(username+might+exist)")
