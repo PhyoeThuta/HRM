@@ -119,6 +119,7 @@
     </a>
     {% endif %}
 
+    {% if not current_user or current_user.role != 'boss' %}
     <p class="px-3 pt-5 pb-1 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Personal</p>
     <a href="/portal"
        class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20">
@@ -129,6 +130,7 @@
       </div>
       <span>My Portal</span>
     </a>
+    {% endif %}
   </nav>
 
   <!-- User footer -->
