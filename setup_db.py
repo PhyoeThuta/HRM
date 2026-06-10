@@ -583,8 +583,10 @@ VALUES
   ('Logistics Manager',      'Manager',    'Logistics & Delivery',  3500),
   ('Delivery Driver',        'Junior',     'Logistics & Delivery',  1800),
   ('Customer Service Agent', 'Junior',     'Customer Service',      1800),
+  ('Marketing Associate',      'Junior',     'Marketing & Sales',          1200),
   ('HR Manager',             'Manager',    'Human Resources',       3500),
   ('Accountant',             'Mid',        'Finance & Admin',       2500),
+  ('Finance Manager',        'Manager',    'Finance & Admin',       4500),
   ('General Manager',        'Executive',  'Finance & Admin',       6000),
   ('Internship',             'Intern',     'General',                800),
   ('Daily Wage Worker',      'Contractor', 'General',               1200)

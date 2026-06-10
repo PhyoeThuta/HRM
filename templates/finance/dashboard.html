@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Finance Dashboard — CorpHRM{% endblock %}
+{% block page_title %}Finance Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8">
+  <header class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-black text-white tracking-tight">Finance Overview</h1>
+      <p class="text-sm text-slate-400 mt-1">Manage payroll execution and final settlements.</p>
+    </div>
+    <div class="flex gap-3">
+      <a href="/payroll" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 transition-all">Go to Payroll</a>
+    </div>
+  </header>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- Stat 1 -->
+    <div class="bg-surface-800 rounded-3xl p-6 border border-white/5 shadow-2xl relative overflow-hidden group">
+      <div class="absolute top-0 right-0 p-6 opacity-20 group-hover:scale-110 transition-transform duration-500">
+        <span class="text-6xl">💰</span>
+      </div>
+      <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Total Disbursed</h3>
+      <p class="text-4xl font-black text-emerald-400 mt-2">${{ "{:,.2f}".format(stats.total_disbursed) }}</p>
+      <div class="mt-4 flex items-center text-xs font-medium text-emerald-400/80 bg-emerald-400/10 w-max px-2.5 py-1 rounded-full">
+        <span>Lifetime Payroll Paid</span>
+      </div>
+    </div>
+
+    <!-- Stat 2 -->
+    <div class="bg-surface-800 rounded-3xl p-6 border border-white/5 shadow-2xl relative overflow-hidden group">
+      <div class="absolute top-0 right-0 p-6 opacity-20 group-hover:scale-110 transition-transform duration-500">
+        <span class="text-6xl">⏳</span>
+      </div>
+      <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Pending Payrolls</h3>
+      <p class="text-4xl font-black text-amber-400 mt-2">{{ stats.pending_payrolls }}</p>
+      <div class="mt-4 flex items-center text-xs font-medium text-amber-400/80 bg-amber-400/10 w-max px-2.5 py-1 rounded-full">
+        <span>Awaiting Approval & Payment</span>
+      </div>
+    </div>
+
+    <!-- Stat 3 -->
+    <div class="bg-surface-800 rounded-3xl p-6 border border-white/5 shadow-2xl relative overflow-hidden group">
+      <div class="absolute top-0 right-0 p-6 opacity-20 group-hover:scale-110 transition-transform duration-500">
+        <span class="text-6xl">📝</span>
+      </div>
+      <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Pending Settlements</h3>
+      <p class="text-4xl font-black text-rose-400 mt-2">{{ stats.pending_settlements }}</p>
+      <div class="mt-4 flex items-center text-xs font-medium text-rose-400/80 bg-rose-400/10 w-max px-2.5 py-1 rounded-full">
+        <span>Offboarding Hold Final Payroll</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Activity / Notifications -->
+  <div class="bg-surface-800 rounded-3xl p-6 border border-white/5 shadow-2xl">
+    <h3 class="text-lg font-bold text-white mb-4">Action Items</h3>
+    {% if stats.pending_payrolls > 0 %}
+    <div class="flex items-center justify-between p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl mb-3">
+      <div>
+        <h4 class="text-sm font-bold text-amber-400">Payroll Pending Approval</h4>
+        <p class="text-xs text-slate-400">You have {{ stats.pending_payrolls }} payroll records awaiting disbursement.</p>
+      </div>
+      <a href="/payroll" class="text-xs font-bold text-white bg-amber-500/20 hover:bg-amber-500/30 px-3 py-1.5 rounded-lg transition-colors">Review</a>
+    </div>
+    {% endif %}
+
+    {% if stats.pending_settlements > 0 %}
+    <div class="flex items-center justify-between p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
+      <div>
+        <h4 class="text-sm font-bold text-rose-400">Offboarding Settlements Due</h4>
+        <p class="text-xs text-slate-400">{{ stats.pending_settlements }} employees require final settlement clearance.</p>
+      </div>
+      <a href="/offboarding" class="text-xs font-bold text-white bg-rose-500/20 hover:bg-rose-500/30 px-3 py-1.5 rounded-lg transition-colors">Process</a>
+    </div>
+    {% endif %}
+    
+    {% if stats.pending_payrolls == 0 and stats.pending_settlements == 0 %}
+    <p class="text-sm text-slate-500 italic">All caught up! No pending financial actions.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

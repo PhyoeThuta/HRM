@@ -56,6 +56,7 @@
     </a>
     {% endmacro %}
 
+
     <!-- Section: Core -->
     <p class="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Core</p>
     {{ nav_item("dashboard",  "/dashboard",  "Dashboard",   "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6") }}
@@ -117,6 +118,17 @@
       <span>User Accounts</span>
     </a>
     {% endif %}
+
+    <p class="px-3 pt-5 pb-1 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Personal</p>
+    <a href="/portal"
+       class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20">
+      <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0">
+        <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+        </svg>
+      </div>
+      <span>My Portal</span>
+    </a>
   </nav>
 
   <!-- User footer -->

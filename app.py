@@ -52,6 +52,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return RedirectResponse("/login", status_code=302)
         if user.get("role") == "employee" and not path.startswith("/portal") and not path.startswith("/documents") and not path.startswith("/notifications"):
             return RedirectResponse("/portal", status_code=302)
+            
+        if user.get("role") == "finance" and not path.startswith("/finance") and not path.startswith("/payroll") and not path.startswith("/offboarding") and not path.startswith("/logout") and not path.startswith("/portal") and not path.startswith("/documents") and not path.startswith("/notifications"):
+            return RedirectResponse("/finance/dashboard", status_code=302)
+            
+        if path.startswith("/payroll"):
+            if user.get("role") not in ["boss", "finance", "admin"]:
+                return RedirectResponse("/dashboard", status_code=302)
+                
         if path.startswith("/boss"):
             if path.startswith("/boss/users") or path.startswith("/boss/announcements"):
                 if user.get("role") not in ["boss", "hr_manager", "admin"]:
@@ -254,7 +262,7 @@ async def root(request: Request):
 async def login_page(request: Request):
     user = get_current_user(request)
     if user:
-        if user.get("role") == "employee":
+        if user.get("role") in ["employee", "finance"]:
             return RedirectResponse("/portal", 302)
         return RedirectResponse("/dashboard", 302)
     error = request.query_params.get("error")
@@ -281,7 +289,7 @@ async def login_submit(request: Request,
         "full_name": user_rec.get("full_name") or user_rec["username"],
         "employee_id": str(user_rec.get("employee_id") or ""),
     }
-    if user_rec.get("role") == "employee":
+    if user_rec.get("role") in ["employee", "finance"]:
         return RedirectResponse(url="/portal", status_code=302)
     return RedirectResponse(url="/dashboard", status_code=302)
 
@@ -414,7 +422,49 @@ async def employees_add(request: Request,
         "created_at": datetime.now().isoformat(),
     })
     if result:
-        return redirect_with_msg("/employees", success=f"Employee+{Full_name}+added+successfully")
+        # --- Auto-create sys_users account ---
+        try:
+            import hashlib
+            emp_id = result[0]['id']
+            
+            # 1. Determine Username
+            if email:
+                username = email.split('@')[0].lower().replace(" ", "")
+            else:
+                username = employee_id.lower().replace(" ", "")
+                
+            # 2. Determine Role based on position
+            role = "employee"
+            if position_id:
+                pos = db_fetch_one("positions", filters={"id": position_id})
+                if pos:
+                    p_title = pos.get('title', '').lower()
+                    p_team = pos.get('team', '').lower()
+                    if "finance" in p_team or "finance" in p_title:
+                        role = "finance"
+                    elif "hr manager" in p_title or "human resources" in p_team:
+                        role = "hr_manager"
+                    elif "boss" in p_title or "executive" in p_title or "general manager" in p_title:
+                        role = "boss"
+            
+            # 3. Hash default password "123456"
+            pw_hash = hashlib.sha256("123456".encode()).hexdigest()
+            
+            # 4. Insert into sys_users
+            db_insert("sys_users", {
+                "username": username,
+                "password_hash": pw_hash,
+                "role": role,
+                "employee_id": emp_id,
+                "full_name": Full_name
+            })
+            
+            success_msg = f"Employee {Full_name} added! Login Username: {username} | Password: 123456"
+            return redirect_with_msg("/employees", success=success_msg.replace(" ", "+"))
+        except Exception as e:
+            print("Auto-create user failed:", e)
+            return redirect_with_msg("/employees", success=f"Employee+{Full_name}+added+successfully")
+            
     return redirect_with_msg("/employees", error="Failed+to+add+employee")
 
 @app.get("/employees/{emp_id}/edit", response_class=HTMLResponse)
@@ -2137,6 +2187,19 @@ async def boss_kpi_delete(kpi_id: str):
     db_delete("boss_kpi_assignments", kpi_id)
     return redirect_with_msg("/boss/kpi", success="KPI+removed")
 
+@app.post("/boss/users/{user_id}/edit", response_class=RedirectResponse)
+async def boss_users_edit(request: Request, user_id: str,
+    full_name: str = Form(...), username: str = Form(...)):
+    user = getattr(request.state, "user", None)
+    if not user or user.get("role") != "boss":
+        raise HTTPException(403, "Access denied")
+    
+    try:
+        db_update("sys_users", {"full_name": full_name, "username": username}, {"id": user_id})
+        return redirect_with_msg("/boss/users", success="User+account+updated")
+    except Exception as e:
+        return redirect_with_msg("/boss/users", error="Failed+to+update+user+(username+might+exist)")
+
 @app.get("/boss/announcements", response_class=HTMLResponse)
 async def boss_announcements(request: Request):
     announcements = db_fetch("announcements", "*", order="created_at")
@@ -2988,5 +3051,28 @@ async def api_boss_chat(request: Request):
         traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
 
+# ── Finance Manager Panel ───────────────────────────────────────────────────
+@app.get("/finance/dashboard", response_class=HTMLResponse)
+async def finance_dashboard(request: Request):
+    user = get_current_user(request)
+    if not user or user.get("role") not in ["boss", "finance"]:
+        return redirect_with_msg("/dashboard", error="Unauthorized")
+        
+    # Get payroll summary
+    payrolls = db_fetch("payrolls", "*")
+    total_disbursed = sum(float(p.get("net_salary") or 0) for p in payrolls if p.get("payment_status") == "Paid")
+    pending_count = sum(1 for p in payrolls if p.get("payment_status") == "Pending")
+    
+    # Get offboarding settlements
+    offboarding = db_fetch("corporate_offboarding", "*", filters={"settlement_status": "Hold Final Payroll"})
+    pending_settlements = len(offboarding)
+    
+    stats = {
+        "total_disbursed": total_disbursed,
+        "pending_payrolls": pending_count,
+        "pending_settlements": pending_settlements
+    }
+    
+    return templates.TemplateResponse("finance/dashboard.html", ctx(request, "finance_dashboard", stats=stats))
 if __name__ == "__main__":
     uvicorn.run("app:app", host="127.0.0.1", port=5000, reload=False)

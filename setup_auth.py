@@ -20,6 +20,7 @@ def run():
         id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         username      TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
+        email         TEXT,
         role          TEXT NOT NULL DEFAULT 'employee',
         full_name     TEXT,
         employee_id   UUID REFERENCES "Employees"(id) ON DELETE SET NULL,
@@ -68,6 +69,7 @@ def run():
     defaults = [
         ("boss",       hash_pw("boss1234"),  "boss",            "Boss / CEO"),
         ("hr_manager", hash_pw("hr1234"),    "hr_manager",      "HR Manager"),
+        ("finance_manager", hash_pw("finance1234"), "finance",  "Finance Manager"),
         ("gm",         hash_pw("gm1234"),    "general_manager", "General Manager"),
         ("employee",   hash_pw("emp1234"),   "employee",        "Sample Employee"),
     ]
@@ -86,6 +88,7 @@ def run():
     print("\nLogin Credentials:")
     print("  Boss:           boss / boss1234")
     print("  HR Manager:     hr_manager / hr1234")
+    print("  Finance Manager:finance_manager / finance1234")
     print("  General Manager:gm / gm1234")
     print("  Employee:       employee / emp1234")
 
