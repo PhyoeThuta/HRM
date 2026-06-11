@@ -369,7 +369,7 @@ async def dashboard(request: Request):
             "on_leave": on_leave,
             "today_present": today_present,
             "late_today": late_today,
-            "pending_leaves": pending_leaves,
+            "total_leaves": approved_leaves,
             "pending_clearances": pending_clear,
             "active_onboarding": active_onboard,
             "open_recruitment": open_positions,
@@ -525,6 +525,15 @@ async def employee_profile(request: Request, emp_id: str):
     att_recs = db_fetch("attendance_records", "*", filters={"employee_id": emp_id}, order="check_in")
     for r in att_recs:
         ci, co = r.get("check_in"), r.get("check_out")
+        if ci:
+            try:
+                dt_in = datetime.fromisoformat(ci.replace("Z",""))
+                r["month_group"] = dt_in.strftime("%B %Y")
+            except:
+                r["month_group"] = "Unknown"
+        else:
+            r["month_group"] = "Unknown"
+            
         if ci and co:
             try:
                 dt_in  = datetime.fromisoformat(ci.replace("Z",""))
@@ -647,6 +656,15 @@ def enrich_attendance_records(records: list, emp_map: dict) -> list:
         r["Full_name"]     = emp.get("Full_name", "—")
         r["employee_code"] = emp.get("employee_id", "—")
         ci, co = r.get("check_in"), r.get("check_out")
+        if ci:
+            try:
+                dt_in = datetime.fromisoformat(ci.replace("Z",""))
+                r["month_group"] = dt_in.strftime("%B %Y")
+            except:
+                r["month_group"] = "Unknown"
+        else:
+            r["month_group"] = "Unknown"
+
         if ci and co:
             try:
                 dt_in  = datetime.fromisoformat(ci.replace("Z",""))
@@ -2336,7 +2354,12 @@ async def portal_attendance(request: Request):
 
 @app.get("/portal/attendance/photo", response_class=HTMLResponse)
 async def portal_photo_page(request: Request):
-    return templates.TemplateResponse("portal/photo_checkin.html", ctx(request, "portal"))
+    user = get_current_user(request)
+    emp_id = user.get("employee_id","") if user else ""
+    today = (datetime.utcnow() + timedelta(hours=6, minutes=30)).date().isoformat()
+    existing = db_fetch("attendance_records", "id,check_in,check_out", filters={"employee_id": emp_id})
+    today_rec = next((r for r in existing if str(r.get("check_in","")).startswith(today)), None)
+    return templates.TemplateResponse("portal/photo_checkin.html", ctx(request, "portal", today_rec=today_rec))
 
 @app.get("/portal/leaves", response_class=HTMLResponse)
 async def portal_leaves(request: Request):
@@ -2403,27 +2426,52 @@ async def portal_leave_add(request: Request,
     return redirect_with_msg("/portal/leaves",
         success="Leave+request+submitted.+Awaiting+HR+approval.")
 
-# ── Portal: Photo Check-In POST ──────────────────────────────────────────
 @app.post("/portal/attendance/photo-checkin", response_class=RedirectResponse)
 async def portal_photo_checkin(request: Request,
-    photo_data: str = Form(...)):
+    photo_data: str = Form(...), client_time: str = Form(None)):
     user   = get_current_user(request)
     emp_id = user.get("employee_id","") if user else ""
     if not emp_id:
         return redirect_with_msg("/portal/attendance/photo", error="Account+not+linked+to+employee")
-    today    = date.today().isoformat()
-    existing = db_fetch("attendance_records", "id,check_in", filters={"employee_id": emp_id})
-    already  = any(str(r.get("check_in","")).startswith(today) for r in existing)
-    if already:
-        return redirect_with_msg("/portal/attendance/photo", error="Already+checked+in+today")
-    now_str = datetime.now().isoformat()
-    is_late = datetime.now().hour >= 9
-    db_insert("attendance_records", {
-        "employee_id": emp_id, "check_in": now_str,
-        "attendance_method": "Photo", "is_late": is_late,
-        "created_at": now_str,
-    })
-    return redirect_with_msg("/portal/attendance", success="Photo+check-in+successful!")
+        
+    myanmar_time = datetime.utcnow() + timedelta(hours=6, minutes=30)
+    today = myanmar_time.date().isoformat()
+    
+    # Trust the client time from frontend JS to match UI, but fallback to server time
+    if client_time:
+        try:
+            dt = datetime.fromisoformat(client_time.replace('Z', '+00:00')).replace(tzinfo=None)
+            now_str = dt.isoformat()
+            is_late = dt.hour >= 9
+        except Exception:
+            now_str = myanmar_time.isoformat()
+            is_late = myanmar_time.hour >= 9
+    else:
+        now_str = myanmar_time.isoformat()
+        is_late = myanmar_time.hour >= 9
+
+    existing = db_fetch("attendance_records", "*", filters={"employee_id": emp_id})
+    today_recs = [r for r in existing if str(r.get("check_in","")).startswith(today)]
+    
+    photo_url = photo_data if photo_data.startswith("data:image") else None
+
+    if today_recs:
+        today_rec = today_recs[0]
+        if today_rec.get("check_out"):
+            return redirect_with_msg("/portal/attendance/photo", error="Already+checked+out+today")
+        db_update("attendance_records", today_rec["id"], {
+            "check_out": now_str,
+            "check_out_photo_url": photo_url
+        })
+        return redirect_with_msg("/portal/attendance", success="Photo+check-out+successful!")
+    else:
+        db_insert("attendance_records", {
+            "employee_id": emp_id, "check_in": now_str,
+            "attendance_method": "Photo", "is_late": is_late,
+            "created_at": now_str,
+            "check_in_photo_url": photo_url
+        })
+        return redirect_with_msg("/portal/attendance", success="Photo+check-in+successful!")
 
 # ── Portal: QR Check-In page ──────────────────────────────────────────────
 @app.get("/portal/qr-checkin", response_class=HTMLResponse)
@@ -2804,7 +2852,57 @@ async def portal_sops_list(request: Request):
     if not user:
         return redirect_with_msg("/login", error="Please+login")
         
-    sops = db_fetch("daily_sops", "*", filters={"employee_id": user.get("employee_id")}, order="assigned_date")
+    emp_id = user.get("employee_id")
+    if not emp_id:
+        return redirect_with_msg("/portal", error="No+employee+linked")
+
+    import calendar
+    now = datetime.now()
+    year, month = now.year, now.month
+    _, num_days = calendar.monthrange(year, month)
+    month_prefix = f"{year}-{month:02d}"
+    
+    sops = db_fetch("daily_sops", "*", filters={"employee_id": emp_id}, order="assigned_date")
+    
+    # Get default task description from most recent SOP
+    default_task = "1. Check emails\n2. Review daily objectives\n3. Update project status\n4. Submit end-of-day report"
+    if sops:
+        default_task = sops[-1].get("task_description", default_task)
+        
+    sop_dates = {str(s.get("assigned_date"))[:10] for s in sops if s.get("assigned_date")}
+    
+    # Generate missing days for the current month
+    missing_days = []
+    for day in range(1, num_days + 1):
+        date_str = f"{year}-{month:02d}-{day:02d}"
+        if date_str not in sop_dates:
+            missing_days.append({
+                "employee_id": emp_id,
+                "task_description": default_task,
+                "assigned_date": date_str,
+                "is_completed": False,
+                "is_absent": False,
+                "assigned_by": user.get("id")
+            })
+            
+    if missing_days:
+        for d in missing_days:
+            db_insert("daily_sops", d)
+        sops = db_fetch("daily_sops", "*", filters={"employee_id": emp_id}, order="assigned_date")
+        
+    # LINK ATTENDANCE: If checked in, should not be absent
+    att_recs = db_fetch("attendance_records", "check_in", filters={"employee_id": emp_id})
+    att_dates = {str(r.get("check_in",""))[:10] for r in att_recs if r.get("check_in")}
+    
+    for s in sops:
+        s_date = str(s.get("assigned_date"))[:10]
+        if s_date in att_dates and s.get("is_absent"):
+            s["is_absent"] = False
+            db_update("daily_sops", s["id"], {"is_absent": False})
+            
+    # Filter to only show current month in UI
+    sops = [s for s in sops if str(s.get("assigned_date")).startswith(month_prefix)]
+    
     return templates.TemplateResponse("portal/sops.html", ctx(request, "portal_sops", sops=sops))
 
 def update_sops_kpi(employee_id: str):

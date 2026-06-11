@@ -42,6 +42,11 @@
 
       <!-- Buttons -->
       <div class="space-y-3">
+        {% if today_rec and today_rec.check_out %}
+        <div class="w-full text-sm font-bold text-slate-400 py-3.5 rounded-xl bg-white/5 border border-white/10 text-center">
+          ✅ You have completed your attendance for today.
+        </div>
+        {% else %}
         <div class="flex gap-3">
           <button id="btn-start" onclick="startCamera()"
             class="flex-1 text-sm font-bold text-white py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition-colors">
@@ -59,11 +64,17 @@
         <!-- Submit form (hidden until photo taken) -->
         <form id="checkin-form" method="post" action="/portal/attendance/photo-checkin" class="hidden">
           <input type="hidden" name="photo_data" id="photo-data-input"/>
+          <input type="hidden" name="client_time" id="client-time-input"/>
           <button type="submit" id="btn-submit"
             class="w-full text-sm font-black text-white py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg shadow-emerald-500/20">
+            {% if today_rec %}
+            👋 Confirm Check-Out
+            {% else %}
             ✅ Confirm Check-In
+            {% endif %}
           </button>
         </form>
+        {% endif %}
       </div>
 
       <!-- Info note -->
@@ -122,6 +133,12 @@ function capturePhoto() {
   ctx.drawImage(video, 0, 0);
   const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
   document.getElementById('photo-data-input').value = dataUrl;
+  
+  const now = new Date();
+  const pad = n => n < 10 ? '0' + n : n;
+  const localTime = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+'T'+pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  document.getElementById('client-time-input').value = localTime;
+  
   // Show captured image
   video.classList.add('hidden');
   canvas.classList.remove('hidden');
