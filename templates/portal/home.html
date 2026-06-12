@@ -24,7 +24,7 @@
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
   {% for label, val, clr, icon, href in [
     ("Attendance Records", att_count, "indigo", "📋", "/portal/attendance"),
-    ("Leave Requests", leave_count, "amber", "🏖", "/portal/leaves"),
+    ("Total Leaves", leave_count, "amber", "🏖", "/portal/leaves"),
     ("Payslips", payslip_count, "emerald", "💳", "/portal/payslips"),
     ("Peer Rating", vote_avg if vote_count > 0 else "—", "purple", "⭐", "/portal")
   ] %}

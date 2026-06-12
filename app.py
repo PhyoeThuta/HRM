@@ -2322,7 +2322,8 @@ async def portal_home(request: Request):
     emp    = db_fetch_one("Employees", "*", filters={"id": emp_id}) if emp_id else None
     # Quick stats
     att_count   = len(db_fetch("attendance_records", "id", filters={"employee_id": emp_id})) if emp_id else 0
-    leave_count = len(db_fetch("Leave_Request", "id", filters={"employee_id": emp_id})) if emp_id else 0
+    leave_reqs_list = db_fetch("Leave_Request", "total_days", filters={"employee_id": emp_id}) if emp_id else []
+    leave_count = sum(r.get("total_days") or 0 for r in leave_reqs_list)
     payslip_cnt = len(db_fetch("payrolls", "id", filters={"employee_id": emp_id})) if emp_id else 0
     # Announcements (all + role-targeted)
     all_ann = db_fetch("announcements", "*", order="created_at")
@@ -2411,6 +2412,19 @@ async def portal_leave_add(request: Request,
     if total > remain:
         return redirect_with_msg("/portal/leaves",
             error=f"Only+{remain}+day(s)+of+{lt_name}+remaining")
+            
+    # Check for overlapping dates
+    existing_leaves = db_fetch("Leave_Request", "start_date,end_date,status", filters={"employee_id": emp_id})
+    for l in existing_leaves:
+        if str(l.get("status", "")).lower() not in ["rejected", "cancelled"]:
+            try:
+                ed1 = date.fromisoformat(str(l.get("start_date")))
+                ed2 = date.fromisoformat(str(l.get("end_date")))
+                if max(d1, ed1) <= min(d2, ed2):
+                    return redirect_with_msg("/portal/leaves",
+                        error="Requested+dates+overlap+with+an+existing+leave")
+            except Exception:
+                pass
     db_insert("Leave_Request", {
         "employee_id": emp_id, "leave_type_id": leave_type_id,
         "start_date": start_date, "end_date": end_date,
