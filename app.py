@@ -397,15 +397,20 @@ async def employees_list(request: Request):
         e["dept_name"] = dept_map.get(e.get("Dept_id",""), "—")
         e["pos_title"] = pos_map.get(e.get("position_id",""), "—")
         
+    manager_positions = {p["id"] for p in db_fetch("positions", "id,level") if p.get("level") in ("Manager", "Executive", "Senior")}
+    all_active_emps = db_fetch("Employees", "id,Full_name,employee_id,position_id", filters={"status":"Active"})
+    managers = [e for e in all_active_emps if e.get("position_id") in manager_positions]
     hired_candidates = db_fetch("recruitment_candidates", "*", filters={"status":"Hired"})
     return templates.TemplateResponse("employees/index.html", ctx(request, "employees",
-        employees=employees, departments=depts, positions=positions, candidates=hired_candidates))
+        employees=employees, departments=depts, positions=positions, managers=managers, candidates=hired_candidates))
 
 @app.get("/employees/add", response_class=HTMLResponse)
 async def employees_add_form(request: Request):
     depts     = db_fetch("Departments", "id,Department_name")
     positions = db_fetch("positions", "id,title")
-    managers  = db_fetch("Employees", "id,Full_name,employee_id", filters={"status":"Active"})
+    manager_positions = {p["id"] for p in db_fetch("positions", "id,level") if p.get("level") in ("Manager", "Executive", "Senior")}
+    all_active_emps = db_fetch("Employees", "id,Full_name,employee_id,position_id", filters={"status":"Active"})
+    managers = [e for e in all_active_emps if e.get("position_id") in manager_positions]
     hired_candidates = db_fetch("recruitment_candidates", "*", filters={"status":"Hired"})
     return templates.TemplateResponse("employees/form.html", ctx(request, "employees",
         employee=None, departments=depts, positions=positions, managers=managers, candidates=hired_candidates, action="add"))
@@ -417,13 +422,16 @@ async def employees_add(request: Request,
     Dept_id: str = Form(None), position_id: str = Form(None),
     Manager_id: str = Form(None), hire_date: str = Form(None),
     date_of_birth: str = Form(None), status: str = Form("Active"),
-    salary: str = Form(None)):
+    salary: str = Form(None), national_id: str = Form(None),
+    address: str = Form(None), employment_type: str = Form("Full-Time")):
     result = db_insert("Employees", {
         "employee_id": employee_id, "Full_name": Full_name,
         "email": email, "phone": phone,
         "Dept_id": Dept_id or None, "position_id": position_id or None,
         "Manager_id": Manager_id or None,
         "hire_date": hire_date or None, "date_of_birth": date_of_birth or None,
+        "national_id": national_id or None, "address": address or None,
+        "employment_type": employment_type,
         "status": status, "salary": float(salary) if salary else None,
         "created_at": datetime.now().isoformat(),
     })
@@ -478,7 +486,9 @@ async def employees_edit_form(request: Request, emp_id: str):
     employee  = db_fetch_one("Employees", filters={"id": emp_id})
     depts     = db_fetch("Departments", "id,Department_name")
     positions = db_fetch("positions", "id,title")
-    managers  = db_fetch("Employees", "id,Full_name,employee_id", filters={"status":"Active"})
+    manager_positions = {p["id"] for p in db_fetch("positions", "id,level") if p.get("level") in ("Manager", "Executive", "Senior")}
+    all_active_emps = db_fetch("Employees", "id,Full_name,employee_id,position_id", filters={"status":"Active"})
+    managers = [e for e in all_active_emps if e.get("position_id") in manager_positions]
     if not employee:
         raise HTTPException(404, "Employee not found")
     return templates.TemplateResponse("employees/form.html", ctx(request, "employees",
@@ -490,12 +500,16 @@ async def employees_edit(request: Request, emp_id: str,
     phone: str = Form(None), Dept_id: str = Form(None),
     position_id: str = Form(None), Manager_id: str = Form(None),
     hire_date: str = Form(None), date_of_birth: str = Form(None),
-    status: str = Form("Active"), salary: str = Form(None)):
+    status: str = Form("Active"), salary: str = Form(None),
+    national_id: str = Form(None), address: str = Form(None),
+    employment_type: str = Form("Full-Time")):
     ok = db_update("Employees", emp_id, {
         "Full_name": Full_name, "email": email, "phone": phone,
         "Dept_id": Dept_id or None, "position_id": position_id or None,
         "Manager_id": Manager_id or None,
         "hire_date": hire_date or None, "date_of_birth": date_of_birth or None,
+        "national_id": national_id or None, "address": address or None,
+        "employment_type": employment_type,
         "status": status, "salary": float(salary) if salary else None,
         "updated_at": datetime.now().isoformat(),
     })
@@ -2533,10 +2547,42 @@ async def portal_profile(request: Request):
     emp_id = user.get("employee_id","") if user else ""
     emp    = db_fetch_one("Employees", "*", filters={"id": emp_id}) if emp_id else None
     dept   = None
-    if emp and emp.get("Dept_id"):
-        dept = db_fetch_one("Departments", "Department_name", filters={"id": emp["Dept_id"]})
+    if emp:
+        if emp.get("Dept_id"):
+            dept = db_fetch_one("Departments", "Department_name", filters={"id": emp["Dept_id"]})
+        if emp.get("position_id"):
+            pos = db_fetch_one("positions", "title", filters={"id": emp["position_id"]})
+            if pos:
+                emp["pos_title"] = pos["title"]
+        if emp.get("Manager_id"):
+            mgr = db_fetch_one("Employees", "Full_name", filters={"id": emp["Manager_id"]})
+            if mgr:
+                emp["manager_name"] = mgr["Full_name"]
+                
     return templates.TemplateResponse("portal/profile.html", ctx(request, "portal",
         emp=emp, dept=dept))
+
+@app.get("/portal/colleague/{colleague_id}", response_class=HTMLResponse)
+async def portal_colleague_profile(request: Request, colleague_id: str):
+    emp = db_fetch_one("Employees", "*", filters={"id": colleague_id})
+    dept = {}
+    if emp:
+        dept_id = emp.get("Dept_id")
+        if dept_id:
+            dept = db_fetch_one("Departments", "*", filters={"id": dept_id})
+        pos_id = emp.get("position_id")
+        if pos_id:
+            pos = db_fetch_one("positions", "title", filters={"id": pos_id})
+            if pos: emp["pos_title"] = pos["title"]
+        mgr_id = emp.get("Manager_id")
+        if mgr_id:
+            mgr = db_fetch_one("Employees", "Full_name", filters={"id": mgr_id})
+            if mgr:
+                emp["manager_name"] = mgr["Full_name"]
+                
+    return templates.TemplateResponse("portal/colleague_profile.html", ctx(request, "portal",
+        emp=emp, dept=dept))
+
 
 @app.post("/portal/vote/submit", response_class=RedirectResponse)
 async def portal_vote_submit(request: Request,

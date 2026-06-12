@@ -1,10 +1,17 @@
 {% extends "portal/base.html" %}
-{% block title %}My Profile — Employee Portal{% endblock %}
-{% block page_title %}My Profile 👤{% endblock %}
-{% block page_subtitle %}Your personal and employment details{% endblock %}
+{% block title %}{{ emp.Full_name }} — Colleague Profile{% endblock %}
+{% block page_title %}Colleague Profile 👤{% endblock %}
+{% block page_subtitle %}Contact and employment details for {{ emp.Full_name }}{% endblock %}
 
 {% block content %}
 {% if emp %}
+<div class="flex items-center justify-between mb-6">
+  <a href="javascript:history.back()" class="text-sm text-slate-400 hover:text-white flex items-center gap-1.5">← Back</a>
+  <a href="/portal/vote/{{ emp.id }}" class="text-sm font-semibold text-white px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition-colors flex items-center gap-2">
+    ⭐ Vote for Colleague
+  </a>
+</div>
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
   <!-- Profile Card -->
@@ -79,11 +86,11 @@
       </div>
     </div>
 
-    <div class="rounded-2xl bg-amber-500/5 border border-amber-500/15 p-4 flex items-start gap-3">
-      <span class="text-xl flex-shrink-0">🔒</span>
+    <div class="rounded-2xl bg-indigo-500/5 border border-indigo-500/15 p-4 flex items-start gap-3">
+      <span class="text-xl flex-shrink-0">📬</span>
       <div>
-        <p class="text-xs font-semibold text-amber-400">Profile Update</p>
-        <p class="text-xs text-slate-400 mt-0.5">To update your personal information, contact HR directly. Salary and sensitive information is not shown here.</p>
+        <p class="text-xs font-semibold text-indigo-400">Contact Colleague</p>
+        <p class="text-xs text-slate-400 mt-0.5">Use the email or phone number above to reach out directly.</p>
       </div>
     </div>
   </div>
@@ -91,10 +98,9 @@
 
 {% else %}
 <div class="rounded-2xl bg-surface-800 border border-white/5 p-16 text-center">
-  <div class="text-5xl mb-3">🔗</div>
-  <p class="text-lg font-bold text-white mb-2">Account Not Linked</p>
-  <p class="text-slate-400 text-sm">Your login account is not connected to an employee record.</p>
-  <p class="text-slate-500 text-xs mt-2">Please ask HR to link your account in the User Accounts section.</p>
+  <div class="text-5xl mb-3">❓</div>
+  <p class="text-lg font-bold text-white mb-2">Colleague Not Found</p>
+  <p class="text-slate-400 text-sm">The requested employee record could not be found.</p>
 </div>
 {% endif %}
 {% endblock %}
