@@ -5,7 +5,7 @@ from zk import ZK
 # --- Configuration ---
 ZK_DEVICE_IP = '192.168.1.121'
 ZK_DEVICE_PORT = 4370
-API_URL = "https://hrm-prototype-v2-0-632906475159.asia-southeast1.run.app/api/biometric/sync"
+API_URL = "https://hrm-al74.onrender.com/api/biometric/sync"
 API_KEY = "zkteco-secret-key-123"
 SYNC_INTERVAL_SECONDS = 300  # Sync every 5 minutes
 
