@@ -962,6 +962,78 @@ async def biometric_checkin(
     action = "checked+in" if scan_type == "in" else "checked+out"
     return RedirectResponse(url=f"/attendance?tab=biometric&success=Biometric+{action}+for+{name}", status_code=302)
 
+# ── API Endpoint for ZKTeco Agent Sync ─────────────────────────────────
+from pydantic import BaseModel
+from typing import List
+from fastapi import HTTPException
+
+class AttendanceLog(BaseModel):
+    fingerprint_id: str
+    timestamp: str
+
+@app.post("/api/biometric/sync")
+async def sync_biometric_attendance(records: List[AttendanceLog], api_key: str = None):
+    # Simple security check (fallback key for prototype)
+    EXPECTED_KEY = os.getenv("BIOMETRIC_API_KEY", "zkteco-secret-key-123")
+    if api_key != EXPECTED_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized API Key")
+        
+    count = 0
+    now_str = datetime.now().isoformat()
+    today_str = date.today().isoformat()
+    
+    for record in records:
+        # Avoid duplicate logs by checking raw_time and employee in biometric_logs
+        # Since fingerprint_id is mapped, first find the employee
+        bio_emp = db_fetch_one("biometric_employees", "*", filters={"biometric_id": record.fingerprint_id})
+        
+        if bio_emp:
+            emp_id = bio_emp["employee_id"]
+            device_id = bio_emp.get("device_id")
+            log_time = record.timestamp
+            
+            # Check if this exact timestamp was already synced
+            existing_log = db_fetch_one("biometric_logs", "id", filters={"employee_id": emp_id, "raw_time": log_time})
+            if existing_log:
+                continue # Skip duplicates
+            
+            # 1. Log the raw punch
+            db_insert("biometric_logs", {
+                "device_id": device_id,
+                "employee_id": emp_id,
+                "raw_time": log_time,
+                "type": "in", # Base type
+                "verification_status": "verified",
+                "new_data": True,
+                "created_at": now_str
+            })
+            
+            # 2. Update attendance_records (Auto Check-In / Check-Out Logic)
+            # Find today's records for this employee
+            log_date = log_time.split("T")[0] if "T" in log_time else log_time.split(" ")[0]
+            all_recs = db_fetch("attendance_records", "*", filters={"employee_id": emp_id})
+            today_recs = [r for r in all_recs if str(r.get("check_in", "")).startswith(log_date)]
+            
+            if not today_recs:
+                # No check-in today -> Create new check-in
+                db_insert("attendance_records", {
+                    "employee_id": emp_id,
+                    "check_in": log_time,
+                    "attendance_method": "Biometric",
+                    "is_late": False,
+                    "created_at": now_str
+                })
+            else:
+                # Already checked in -> Treat subsequent punches as check-out
+                # (Update the check_out time of the first record found today)
+                first_rec = today_recs[0]
+                # Only update check_out if the new punch is significantly later (e.g. > 1 min) to avoid double-tap issues
+                db_update("attendance_records", first_rec["id"], {"check_out": log_time})
+                
+            count += 1
+            
+    return {"status": "success", "message": f"{count} new records synced successfully"}
+
 # ══════════════════════════════════════════════
 #  5. LEAVE MANAGEMENT
 # ══════════════════════════════════════════════
