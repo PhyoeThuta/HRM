@@ -38,7 +38,7 @@ else:
 #  APP INIT  (middleware order: Session → Auth → Routes)
 # ─────────────────────────────────────────────
 ADMIN_ROLES  = {"boss", "hr_manager", "general_manager"}
-PUBLIC_PATHS = ["/login", "/logout", "/static", "/attendance/scan", "/careers"]
+PUBLIC_PATHS = ["/login", "/logout", "/static", "/attendance/scan", "/careers", "/api/biometric/sync"]
 
 app = FastAPI(title="Corporate HRM Enterprise", version="2.0.0")
 app.mount("/static", StaticFiles(directory="static"), name="static")
