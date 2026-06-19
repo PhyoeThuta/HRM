@@ -225,7 +225,7 @@
         {% elif current_user.role == 'hr_manager' %}text-indigo-400 bg-indigo-500/10 border border-indigo-500/20
         {% elif current_user.role == 'general_manager' %}text-cyan-400 bg-cyan-500/10 border border-cyan-500/20
         {% else %}text-slate-400 bg-white/5{% endif %}">
-        {% if current_user.role == 'boss' %}👑{% elif current_user.role == 'hr_manager' %}🧑‍💼{% elif current_user.role == 'general_manager' %}🏢{% else %}👤{% endif %}
+        {% if current_user.role == 'boss' %}💼{% elif current_user.role == 'hr_manager' %}🧑‍💼{% elif current_user.role == 'general_manager' %}🏢{% else %}👤{% endif %}
         {{ current_user.role | replace('_',' ') | title }}
       </span>
       <a href="/logout" class="text-xs text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 px-3 py-1.5 rounded-xl transition-colors font-semibold">Logout</a>
