@@ -244,10 +244,17 @@ def ctx(request, page: str, **kwargs):
         except Exception as e:
             print("Notification fetch err:", e)
 
+    is_offboarding = False
+    if user and user.get("employee_id") and page.startswith("portal"):
+        ob_chk = db_fetch_one("corporate_offboarding", "id", filters={"employee_id": user["employee_id"]})
+        if ob_chk:
+            is_offboarding = True
+
     return {"request": request, "page": page,
             "current_user": user,
             "notifications": notifications,
             "unread_count": unread_count,
+            "is_offboarding": is_offboarding,
             "success": request.query_params.get("success"),
             "error":   request.query_params.get("error"),
             **kwargs}
@@ -709,11 +716,18 @@ async def attendance_list(request: Request):
         emp = emp_map.get(t.get("employee_id",""), {})
         t["Full_name"] = emp.get("Full_name","—")
         t["emp_code"]  = emp.get("employee_id","—")
+        
+    today_prefix = datetime.now().strftime("%Y-%m-%d")
+    stats_present = sum(1 for r in records if str(r.get("check_in", "")).startswith(today_prefix))
+    stats_late = sum(1 for r in records if r.get("is_late") and str(r.get("check_in", "")).startswith(today_prefix))
+    stats_in_office = sum(1 for r in records if str(r.get("check_in", "")).startswith(today_prefix) and not r.get("check_out"))
+
     today_str = datetime.now().strftime("%A, %d %B %Y")
     return templates.TemplateResponse("attendance.html", ctx(request, "attendance",
         records=records, employees=employees, today=today_str,
         biometric_devices=bio_devices, biometric_registrations=bio_regs,
-        biometric_logs=bio_logs, active_tokens=tokens, qr_data=None))
+        biometric_logs=bio_logs, active_tokens=tokens, qr_data=None,
+        stats_present=stats_present, stats_late=stats_late, stats_in_office=stats_in_office))
 
 @app.post("/attendance/add", response_class=RedirectResponse)
 async def attendance_add(
@@ -795,9 +809,22 @@ async def attendance_generate_qr(request: Request, employee_id: str = Form(...))
         e2 = emp_map.get(t.get("employee_id",""), {})
         t["Full_name"]  = e2.get("Full_name","—")
         t["emp_code"]   = e2.get("employee_id","—")
+    today_prefix = datetime.now().strftime("%Y-%m-%d")
+    stats_present = sum(1 for r in records if str(r.get("check_in", "")).startswith(today_prefix))
+    stats_late = sum(1 for r in records if r.get("is_late") and str(r.get("check_in", "")).startswith(today_prefix))
+    stats_in_office = sum(1 for r in records if str(r.get("check_in", "")).startswith(today_prefix) and not r.get("check_out"))
+
+    # Also fetch biometric data to ensure template has all variables
+    bio_devices = db_fetch("biometric_device", "*", order="created_at")
+    bio_regs    = db_fetch("biometric_employees", "*")
+    bio_logs    = db_fetch("biometric_logs", "*", order="created_at")
+
     today_str = datetime.now().strftime("%A, %d %B %Y")
     return templates.TemplateResponse("attendance.html", ctx(request, "attendance",
         records=records, employees=employees, active_tokens=tokens, today=today_str,
+        biometric_devices=bio_devices, biometric_registrations=bio_regs,
+        biometric_logs=bio_logs,
+        stats_present=stats_present, stats_late=stats_late, stats_in_office=stats_in_office,
         qr_data={
             "image_b64": b64,
             "emp_name": emp.get("Full_name","—"),
@@ -832,9 +859,10 @@ async def attendance_scan_qr(request: Request, token: str):
         db_update("attendance_records", today_rec["id"], {"check_out": now_str})
         action_msg = "Check-Out recorded successfully"
     else:
+        is_late = datetime.now().hour >= 9
         db_insert("attendance_records", {
             "employee_id": emp_id, "check_in": now_str,
-            "attendance_method": "QR", "is_late": False, "created_at": now_str,
+            "attendance_method": "QR", "is_late": is_late, "created_at": now_str,
         })
         action_msg = "Check-In recorded successfully"
     db_update("qr_attendance_tokens", rec["id"], {"used": True, "used_at": now_str})
@@ -921,6 +949,46 @@ async def biometric_register(
     name = emp.get("Full_name","Employee") if emp else "Employee"
     return RedirectResponse(url=f"/attendance?tab=biometric&success={name}+biometric+ID+registered", status_code=302)
 
+@app.post("/attendance/biometric/device/{device_id}/edit", response_class=RedirectResponse)
+async def biometric_device_edit(
+    device_id: str,
+    device_name: str = Form(...),
+    ip_address: str = Form(None),
+    port: str = Form("4370"),
+    location: str = Form(None)):
+    db_update("biometric_device", device_id, {
+        "device_name": device_name,
+        "ip_address":  ip_address or None,
+        "port":        int(port) if port else 4370,
+        "location":    location or None,
+        "updated_at":  datetime.now().isoformat(),
+    })
+    return RedirectResponse(url="/attendance?tab=biometric&success=Device+updated+successfully", status_code=302)
+
+@app.post("/attendance/biometric/device/{device_id}/delete", response_class=RedirectResponse)
+async def biometric_device_delete(device_id: str):
+    db_delete("biometric_device", device_id)
+    return RedirectResponse(url="/attendance?tab=biometric&success=Device+deleted", status_code=302)
+
+@app.post("/attendance/biometric/register/{reg_id}/edit", response_class=RedirectResponse)
+async def biometric_register_edit(
+    reg_id: str,
+    employee_id: str = Form(...),
+    device_id: str = Form(...),
+    biometric_id: str = Form(...)):
+    db_update("biometric_employees", reg_id, {
+        "employee_id":  employee_id,
+        "device_id":    device_id,
+        "biometric_id": biometric_id,
+        "updated_at":   datetime.now().isoformat(),
+    })
+    return RedirectResponse(url="/attendance?tab=biometric&success=Employee+mapping+updated", status_code=302)
+
+@app.post("/attendance/biometric/register/{reg_id}/delete", response_class=RedirectResponse)
+async def biometric_register_delete(reg_id: str):
+    db_delete("biometric_employees", reg_id)
+    return RedirectResponse(url="/attendance?tab=biometric&success=Employee+mapping+deleted", status_code=302)
+
 # ── Biometric Check-In Simulation ──────────────────────────────────────
 @app.post("/attendance/biometric/checkin", response_class=RedirectResponse)
 async def biometric_checkin(
@@ -942,11 +1010,16 @@ async def biometric_checkin(
     })
     # Record in attendance_records
     if scan_type == "in":
+        try:
+            dt = datetime.fromisoformat(raw_time.replace('Z', '+00:00')).replace(tzinfo=None)
+            is_late = dt.hour >= 9
+        except:
+            is_late = False
         db_insert("attendance_records", {
             "employee_id":       employee_id,
             "check_in":          raw_time,
             "attendance_method": "Biometric",
-            "is_late":           False,
+            "is_late":           is_late,
             "created_at":        now_str,
         })
     else:
@@ -1016,11 +1089,16 @@ async def sync_biometric_attendance(records: List[AttendanceLog], api_key: str =
             
             if not today_recs:
                 # No check-in today -> Create new check-in
+                try:
+                    dt = datetime.fromisoformat(log_time.replace('Z', '+00:00')).replace(tzinfo=None)
+                    is_late = dt.hour >= 9
+                except:
+                    is_late = False
                 db_insert("attendance_records", {
                     "employee_id": emp_id,
                     "check_in": log_time,
                     "attendance_method": "Biometric",
-                    "is_late": False,
+                    "is_late": is_late,
                     "created_at": now_str
                 })
             else:
@@ -2750,6 +2828,84 @@ async def portal_vote_cast(request: Request, nominee_id: str,
     })
     return redirect_with_msg(f"/portal/vote/{nominee_id}",
         success=f"Vote+submitted+for+{name.replace(' ','+')}")
+
+# ── Portal: Exit Survey ──────────────────────────────────────────────────
+@app.get("/portal/exit-survey", response_class=HTMLResponse)
+async def portal_exit_survey_get(request: Request):
+    user = get_current_user(request)
+    emp_id = user.get("employee_id","") if user else ""
+    if not emp_id:
+        return RedirectResponse("/portal", 302)
+    
+    ob = db_fetch_one("corporate_offboarding", "*", filters={"employee_id": emp_id})
+    if not ob:
+        return redirect_with_msg("/portal", error="You+are+not+in+the+offboarding+process")
+    
+    ei = db_fetch_one("exit_interviews", "*", filters={"offboarding_id": str(ob["id"])})
+    
+    return templates.TemplateResponse("portal/exit_survey.html", ctx(request, "portal", ob=ob, ei=ei))
+
+@app.post("/portal/exit-survey", response_class=RedirectResponse)
+async def portal_exit_survey_post(request: Request,
+    reason_for_leaving: str = Form(None),
+    job_satisfaction: str = Form("3"),
+    management_rating: str = Form("3"),
+    work_env_rating: str = Form("3"),
+    compensation_rating: str = Form("3"),
+    growth_rating: str = Form("3"),
+    would_return: str = Form("false"),
+    would_recommend: str = Form("false"),
+    highlights: str = Form(None),
+    improvements: str = Form(None),
+    additional_comments: str = Form(None)):
+    
+    user = get_current_user(request)
+    emp_id = user.get("employee_id","") if user else ""
+    if not emp_id:
+        return RedirectResponse("/portal", 302)
+        
+    ob = db_fetch_one("corporate_offboarding", "*", filters={"employee_id": emp_id})
+    if not ob:
+        return redirect_with_msg("/portal", error="You+are+not+in+the+offboarding+process")
+        
+    ei = db_fetch_one("exit_interviews", "id", filters={"offboarding_id": str(ob["id"])})
+    
+    data = {
+        "offboarding_id": str(ob["id"]),
+        "employee_id": emp_id,
+        "interviewer_id": None, # Self-submitted
+        "interview_date": date.today().isoformat(),
+        "reason_for_leaving": reason_for_leaving,
+        "job_satisfaction": int(job_satisfaction),
+        "management_rating": int(management_rating),
+        "work_env_rating": int(work_env_rating),
+        "compensation_rating": int(compensation_rating),
+        "growth_rating": int(growth_rating),
+        "would_return": would_return.lower() == "true",
+        "would_recommend": would_recommend.lower() == "true",
+        "highlights": highlights,
+        "improvements": improvements,
+        "additional_comments": additional_comments,
+        "status": "Completed"
+    }
+    
+    is_new = False
+    if ei:
+        db_update("exit_interviews", str(ei["id"]), data)
+    else:
+        data["created_at"] = datetime.now().isoformat()
+        db_insert("exit_interviews", data)
+        is_new = True
+        
+    # Notify Boss and HR Manager
+    if is_new:
+        emp_name = user.get("full_name", "An employee")
+        link = f"/offboarding/{ob['id']}/exit-interview"
+        msg = f"{emp_name} has submitted their Exit Survey."
+        notify_role("boss", "Exit Survey Submitted", msg, link)
+        notify_role("hr_manager", "Exit Survey Submitted", msg, link)
+        
+    return redirect_with_msg("/portal/exit-survey", success="Exit+Survey+submitted+successfully!")
 
 # ── DOCUMENTS VAULT ─────────────────────────────────────────────
 @app.get("/documents", response_class=HTMLResponse)

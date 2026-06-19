@@ -8,9 +8,9 @@
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
   {% for label, val, clr in [
     ("Total Records", records|length, "indigo"),
-    ("Present Today", records|selectattr("check_in")|list|length, "emerald"),
-    ("Late Arrivals", records|selectattr("is_late")|list|length, "amber"),
-    ("Still In Office", records|rejectattr("check_out")|selectattr("check_in")|list|length, "cyan")
+    ("Present Today", stats_present, "emerald"),
+    ("Late Arrivals", stats_late, "amber"),
+    ("Still In Office", stats_in_office, "cyan")
   ] %}
   <div class="rounded-2xl bg-surface-800 border border-{{ clr }}-500/20 p-4 flex items-center gap-4">
     <p class="text-2xl font-black text-white">{{ val }}</p>
@@ -251,9 +251,13 @@
               <p class="text-xs text-slate-500 font-mono">{{ dev.ip_address }}:{{ dev.port }}</p>
               <p class="text-xs text-slate-500">📍 {{ dev.location or '—' }}</p>
             </div>
-            <span class="text-xs px-2.5 py-1 rounded-full font-semibold {{ 'text-emerald-400 bg-emerald-400/10' if dev.status == 'Active' else 'text-slate-400 bg-white/5' }}">
-              {{ '● Active' if dev.status == 'Active' else dev.status }}
-            </span>
+            <div class="flex items-center gap-3">
+              <span class="text-xs px-2.5 py-1 rounded-full font-semibold {{ 'text-emerald-400 bg-emerald-400/10' if dev.status == 'Active' else 'text-slate-400 bg-white/5' }}">
+                {{ '● Active' if dev.status == 'Active' else dev.status }}
+              </span>
+              <button type="button" onclick="editDevice('{{ dev.id }}', '{{ dev.device_name|escape }}', '{{ dev.ip_address|escape }}', '{{ dev.port }}', '{{ dev.location|escape }}')" class="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-2 py-1 rounded-lg">Edit</button>
+              <button type="button" onclick="confirmDelete('Delete this device?', '/attendance/biometric/device/{{ dev.id }}/delete')" class="text-xs text-rose-400 hover:text-rose-300 bg-rose-500/10 px-2 py-1 rounded-lg">Delete</button>
+            </div>
           </div>
           {% endfor %}
         </div>
@@ -312,9 +316,13 @@
                 <p class="text-xs text-slate-500">Device ID: <span class="font-mono text-purple-400">{{ reg.biometric_id }}</span></p>
               </div>
             </div>
-            <span class="text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-2.5 py-1 rounded-full">
-              ✓ Enrolled
-            </span>
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-2.5 py-1 rounded-full">
+                ✓ Enrolled
+              </span>
+              <button type="button" onclick="editRegister('{{ reg.id }}', '{{ reg.employee_id }}', '{{ reg.device_id }}', '{{ reg.biometric_id|escape }}')" class="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-2 py-1 rounded-lg">Edit</button>
+              <button type="button" onclick="confirmDelete('Delete this employee mapping?', '/attendance/biometric/register/{{ reg.id }}/delete')" class="text-xs text-rose-400 hover:text-rose-300 bg-rose-500/10 px-2 py-1 rounded-lg">Delete</button>
+            </div>
           </div>
           {% endfor %}
         </div>
@@ -597,7 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function exportToCSV() {
   const rows = document.querySelectorAll('#attendance-tbody tr');
-  let csvContent = "data:text/csv;charset=utf-8,";
+  let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
   
   // Add headers
   csvContent += "Employee,Check In,Check Out,Method,Hours,Overtime,Status\n";
@@ -741,5 +749,142 @@ function showPhoto(url) {
   document.getElementById('photo-modal-img').src = url;
   openModal('photo-modal');
 }
+// ── Custom Modals Logic ─────────────────────────────────────────
+function confirmDelete(message, actionUrl) {
+  document.getElementById('delete-modal-msg').innerText = message;
+  document.getElementById('delete-confirm-form').action = actionUrl;
+  openModal('delete-modal');
+}
+
+function editDevice(id, name, ip, port, loc) {
+  document.getElementById('edit-device-form').action = '/attendance/biometric/device/' + id + '/edit';
+  document.getElementById('edit-dev-name').value = name;
+  document.getElementById('edit-dev-ip').value = ip;
+  document.getElementById('edit-dev-port').value = port;
+  document.getElementById('edit-dev-loc').value = loc;
+  openModal('edit-device-modal');
+}
+
+function editRegister(id, emp_id, dev_id, bio_id) {
+  document.getElementById('edit-register-form').action = '/attendance/biometric/register/' + id + '/edit';
+  document.getElementById('edit-reg-emp').value = emp_id;
+  document.getElementById('edit-reg-dev').value = dev_id;
+  document.getElementById('edit-reg-bio').value = bio_id;
+  openModal('edit-register-modal');
+}
+
+// Ensure the right tab stays open if requested
+document.addEventListener('DOMContentLoaded', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const tab = urlParams.get('tab');
+  if(tab) {
+    document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+    const pane = document.getElementById('tab-' + tab);
+    if(pane) pane.classList.remove('hidden');
+    
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.classList.remove('text-purple-400', 'border-b-2', 'border-purple-500');
+      btn.classList.add('text-slate-400');
+    });
+    const activeBtn = document.querySelector(`[onclick="switchTab('tab-${tab}')"]`);
+    if(activeBtn) {
+      activeBtn.classList.remove('text-slate-400');
+      activeBtn.classList.add('text-purple-400', 'border-b-2', 'border-purple-500');
+    }
+  }
+});
 </script>
+
+<!-- DELETE CONFIRMATION MODAL -->
+<div id="delete-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('delete-modal')"></div>
+  <div class="relative bg-surface-850 border border-rose-500/20 rounded-2xl w-full max-w-sm m-4 p-6 text-center shadow-2xl">
+    <div class="w-12 h-12 rounded-full bg-rose-500/20 flex items-center justify-center mx-auto mb-4">
+      <span class="text-2xl">⚠️</span>
+    </div>
+    <h3 class="text-lg font-bold text-white mb-2">Are you sure?</h3>
+    <p id="delete-modal-msg" class="text-sm text-slate-400 mb-6">This action cannot be undone.</p>
+    <div class="flex gap-3">
+      <button type="button" onclick="closeModal('delete-modal')" class="flex-1 text-sm font-semibold text-slate-300 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">Cancel</button>
+      <form id="delete-confirm-form" method="post" action="" class="flex-1">
+        <button type="submit" class="w-full text-sm font-semibold text-white py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/20">Yes, Delete</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT DEVICE MODAL -->
+<div id="edit-device-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('edit-device-modal')"></div>
+  <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-md m-4 shadow-2xl">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <h2 class="text-base font-bold text-white flex items-center gap-2">🖥️ Edit Device</h2>
+      <button type="button" onclick="closeModal('edit-device-modal')" class="text-slate-400 hover:text-white">✕</button>
+    </div>
+    <form id="edit-device-form" method="post" action="" class="p-6 space-y-4">
+      <div>
+        <label class="form-label">Device Name *</label>
+        <input id="edit-dev-name" name="device_name" required class="form-input" />
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="form-label">IP Address</label>
+          <input id="edit-dev-ip" name="ip_address" class="form-input" />
+        </div>
+        <div>
+          <label class="form-label">Port</label>
+          <input id="edit-dev-port" name="port" class="form-input" type="number" />
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Location</label>
+        <input id="edit-dev-loc" name="location" class="form-input" />
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeModal('edit-device-modal')" class="flex-1 text-sm font-semibold text-slate-300 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">Cancel</button>
+        <button type="submit" class="flex-1 text-sm font-semibold text-white py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EDIT REGISTER MODAL -->
+<div id="edit-register-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('edit-register-modal')"></div>
+  <div class="relative bg-surface-850 border border-white/10 rounded-2xl w-full max-w-md m-4 shadow-2xl">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      <h2 class="text-base font-bold text-white flex items-center gap-2">🖐️ Edit Employee Mapping</h2>
+      <button type="button" onclick="closeModal('edit-register-modal')" class="text-slate-400 hover:text-white">✕</button>
+    </div>
+    <form id="edit-register-form" method="post" action="" class="p-6 space-y-4">
+      <div>
+        <label class="form-label">Employee *</label>
+        <select id="edit-reg-emp" name="employee_id" required class="form-input">
+          <option value="">— Select Employee —</option>
+          {% for emp in employees %}
+          <option value="{{ emp.id }}">{{ emp.Full_name }} ({{ emp.employee_id }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Device *</label>
+        <select id="edit-reg-dev" name="device_id" required class="form-input">
+          <option value="">— Select Device —</option>
+          {% for dev in biometric_devices %}
+          <option value="{{ dev.id }}">{{ dev.device_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Biometric ID on Device *</label>
+        <input id="edit-reg-bio" name="biometric_id" required class="form-input" />
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeModal('edit-register-modal')" class="flex-1 text-sm font-semibold text-slate-300 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">Cancel</button>
+        <button type="submit" class="flex-1 text-sm font-semibold text-white py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% endblock %}

@@ -20,6 +20,20 @@
   </div>
 </div>
 
+<!-- Offboarding Banner -->
+{% if is_offboarding %}
+<div class="rounded-2xl bg-gradient-to-r from-rose-500/20 via-orange-500/10 to-rose-500/5 border border-rose-500/30 p-5 mb-6 flex items-start gap-4">
+  <div class="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center text-rose-400 flex-shrink-0">
+    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+  </div>
+  <div class="flex-1">
+    <h3 class="text-sm font-bold text-rose-200">Pending Exit Survey</h3>
+    <p class="text-xs text-rose-300/80 mt-1 mb-3">Please complete your exit survey before your final day. Your feedback is highly appreciated.</p>
+    <a href="/portal/exit-survey" class="text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg transition-colors inline-block shadow-lg shadow-rose-500/20">Go to Exit Survey</a>
+  </div>
+</div>
+{% endif %}
+
 <!-- Quick Stats -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
   {% for label, val, clr, icon, href in [

@@ -1,0 +1,107 @@
+{% extends "portal/base.html" %}
+{% block title %}Exit Survey — CorpHRM Portal{% endblock %}
+{% block page_title %}Exit Survey{% endblock %}
+{% block page_subtitle %}Your feedback helps us improve the workplace{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto pb-10">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-white mb-2">Exit Survey</h1>
+    <p class="text-slate-400">We appreciate your feedback. Please share your honest thoughts about your time with us.</p>
+  </div>
+
+  <form method="post" action="/portal/exit-survey" class="space-y-6">
+
+    <!-- Basics -->
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-6">
+      <h2 class="text-sm font-bold text-white mb-4">Why are you leaving?</h2>
+      <div>
+        <label class="form-label">Primary Reason for Leaving</label>
+        <textarea name="reason_for_leaving" rows="3" class="form-input" placeholder="What is the main reason for your departure?" required>{{ ei.reason_for_leaving if ei else '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- Rating Sections -->
+    {% set ratings = [
+      ("job_satisfaction","Job Satisfaction","How satisfied were you with your overall role and responsibilities?","text-indigo-400","from-indigo-500"),
+      ("management_rating","Management & Leadership","How would you rate the quality of management and leadership?","text-cyan-400","from-cyan-500"),
+      ("work_env_rating","Work Environment","How would you rate the overall work culture and environment?","text-purple-400","from-purple-500"),
+      ("compensation_rating","Compensation & Benefits","How satisfied were you with your salary and benefits package?","text-emerald-400","from-emerald-500"),
+      ("growth_rating","Career Growth","How would you rate opportunities for career development and advancement?","text-amber-400","from-amber-500"),
+    ] %}
+
+    {% for field, title, desc, clr, grad in ratings %}
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-6">
+      <h2 class="text-sm font-bold text-white mb-1">{{ title }}</h2>
+      <p class="text-xs text-slate-400 mb-4">{{ desc }}</p>
+      <div class="flex items-center gap-3">
+        {% for star in [1,2,3,4,5] %}
+        {% set is_checked = ei and ei.get(field) == star %}
+        <label class="flex flex-col items-center gap-1.5 cursor-pointer group">
+          <input type="radio" name="{{ field }}" value="{{ star }}" class="sr-only peer" {{ 'checked' if is_checked else ('checked' if not ei and star == 3 else '') }}/>
+          <div class="w-12 h-12 rounded-xl border border-white/10 flex items-center justify-center text-xl font-black transition-all duration-200
+                       peer-checked:border-transparent peer-checked:shadow-lg
+                       peer-checked:bg-gradient-to-br peer-checked:{{ grad }} peer-checked:to-pink-600
+                       group-hover:border-white/30 {{ clr }}">{{ star }}</div>
+          <span class="text-[10px] text-slate-500 peer-checked:text-white">
+            {% if star == 1 %}Poor{% elif star == 2 %}Fair{% elif star == 3 %}Good{% elif star == 4 %}Great{% else %}Excellent{% endif %}
+          </span>
+        </label>
+        {% endfor %}
+        <div class="ml-4 text-xs text-slate-400 hidden sm:block"><span>1 = Poor</span><span class="mx-2">·</span><span>5 = Excellent</span></div>
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- Yes/No Questions -->
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-6">
+      <h2 class="text-sm font-bold text-white mb-4">Final Questions</h2>
+      <div class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <p class="text-sm text-white">Would you consider returning to the company in the future?</p>
+          </div>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="would_return" value="true" class="accent-indigo-500 w-4 h-4" {{ 'checked' if ei and ei.would_return else '' }}/><span class="text-sm text-white">Yes</span></label>
+            <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="would_return" value="false" class="accent-rose-500 w-4 h-4" {{ 'checked' if ei and not ei.would_return else 'checked' }}/><span class="text-sm text-white">No</span></label>
+          </div>
+        </div>
+        <div class="border-t border-white/5 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <p class="text-sm text-white">Would you recommend the company to others as a great place to work?</p>
+          </div>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="would_recommend" value="true" class="accent-indigo-500 w-4 h-4" {{ 'checked' if ei and ei.would_recommend else '' }}/><span class="text-sm text-white">Yes</span></label>
+            <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="would_recommend" value="false" class="accent-rose-500 w-4 h-4" {{ 'checked' if ei and not ei.would_recommend else 'checked' }}/><span class="text-sm text-white">No</span></label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Open Feedback -->
+    <div class="rounded-2xl bg-surface-800 border border-white/5 p-6 space-y-4">
+      <h2 class="text-sm font-bold text-white mb-2">Open Feedback</h2>
+      <div>
+        <label class="form-label">What did you enjoy most about working here? (Highlights)</label>
+        <textarea name="highlights" rows="3" class="form-input" placeholder="Positive experiences, achievements, team dynamics...">{{ ei.highlights if ei else '' }}</textarea>
+      </div>
+      <div>
+        <label class="form-label">What could be improved? (Constructive Feedback)</label>
+        <textarea name="improvements" rows="3" class="form-input" placeholder="Processes, culture, management, systems, issues with colleagues...">{{ ei.improvements if ei else '' }}</textarea>
+      </div>
+      <div>
+        <label class="form-label">Any additional comments?</label>
+        <textarea name="additional_comments" rows="2" class="form-input" placeholder="Anything else you'd like to share...">{{ ei.additional_comments if ei else '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="flex items-center justify-end gap-3 pt-4">
+      <a href="/portal" class="text-sm text-slate-400 hover:text-white px-5 py-3 rounded-xl bg-white/5 transition-colors">Cancel</a>
+      <button type="submit" class="text-sm font-bold text-white px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/20">
+        {{ 'Update Survey' if ei else 'Submit Survey' }}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
